@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <radialGradient id="innerGreen" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="45%" stop-color="#22c55e"/>
+      <stop offset="85%" stop-color="#16a34a"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </radialGradient>
+    <linearGradient id="goldBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="torchGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="flameGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="60%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    
+    <!-- Text Paths for circular text -->
+    <path id="textPathTop" d="M 75 250 A 175 175 0 1 1 425 250" fill="none"/>
+    <path id="textPathBottom" d="M 420 250 A 170 170 0 0 1 80 250" fill="none"/>
+  </defs>
+
+  <!-- Outer Yellow Border -->
+  <circle cx="250" cy="250" r="242" fill="#eab308" stroke="#ca8a04" stroke-width="3"/>
+  <circle cx="250" cy="250" r="236" fill="#ffffff"/>
+  
+  <!-- Outer Dark Green Ring -->
+  <circle cx="250" cy="250" r="230" fill="#15803d" stroke="#ca8a04" stroke-width="4"/>
+
+  <!-- Top Text: MADRASAH TSANAWIYAH KH. A. WAHAB MUHSIN -->
+  <text font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="900" font-size="22" fill="#fef08a" letter-spacing="1.2">
+    <textPath href="#textPathTop" startOffset="50%" text-anchor="middle">
+      MADRASAH TSANAWIYAH KH. A. WAHAB MUHSIN
+    </textPath>
+  </text>
+
+  <!-- Bottom Text: ★ SUKAHIDENG TASIKMALAYA ★ -->
+  <text font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="900" font-size="22" fill="#ffffff" letter-spacing="2">
+    <textPath href="#textPathBottom" startOffset="50%" text-anchor="middle">
+      ★ SUKAHIDENG TASIKMALAYA ★
+    </textPath>
+  </text>
+
+  <!-- Inner Gold Separation Ring -->
+  <circle cx="250" cy="250" r="172" fill="none" stroke="#facc15" stroke-width="4"/>
+  <circle cx="250" cy="250" r="168" fill="none" stroke="#ffffff" stroke-width="2"/>
+
+  <!-- Inner Field (Lush Green with Glow) -->
+  <circle cx="250" cy="250" r="166" fill="url(#innerGreen)"/>
+
+  <!-- Center Graphic: Torch (Obor) -->
+  <g id="torchGroup">
+    <!-- Flame -->
+    <path d="M 250 85 C 238 105, 230 120, 242 135 C 245 130, 248 128, 252 132 C 265 125, 268 105, 250 85 Z" fill="url(#flameGrad)" filter="drop-shadow(0 0 6px #ef4444)"/>
+    <path d="M 250 95 C 244 110, 242 120, 248 130 C 253 125, 257 115, 250 95 Z" fill="#fef08a"/>
+    <!-- Torch Bowl & Handle -->
+    <path d="M 238 135 L 262 135 L 255 142 L 245 142 Z" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <rect x="245" y="142" width="10" height="4" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.5"/>
+    <path d="M 247 146 L 253 146 L 251 210 L 249 210 Z" fill="url(#torchGradient)" stroke="#1e293b" stroke-width="2"/>
+  </g>
+
+  <!-- Left Side: Arc of 9 Tasbih Beads -->
+  <g id="tasbihGroup">
+    <circle cx="205" cy="120" r="8" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <circle cx="185" cy="130" r="9" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <circle cx="170" cy="146" r="10" fill="#ffffff" stroke="#1e293b" stroke-width="2.2"/>
+    <circle cx="158" cy="168" r="11" fill="#ffffff" stroke="#1e293b" stroke-width="2.2"/>
+    <circle cx="152" cy="192" r="12" fill="#ffffff" stroke="#1e293b" stroke-width="2.5"/>
+    <circle cx="154" cy="218" r="12" fill="#ffffff" stroke="#1e293b" stroke-width="2.5"/>
+    <circle cx="162" cy="244" r="12" fill="#ffffff" stroke="#1e293b" stroke-width="2.5"/>
+    <circle cx="178" cy="268" r="12" fill="#ffffff" stroke="#1e293b" stroke-width="2.5"/>
+    <circle cx="200" cy="288" r="11" fill="#ffffff" stroke="#1e293b" stroke-width="2.2"/>
+  </g>
+
+  <!-- Right Side: Golden Rice Stalk (Padi) -->
+  <g id="padiGroup" stroke="#854d0e" stroke-width="1.5">
+    <!-- Main stem -->
+    <path d="M 295 295 C 330 265, 345 200, 315 130" fill="none" stroke="#ca8a04" stroke-width="3"/>
+    <!-- Rice grains -->
+    <path d="M 315 130 Q 325 125, 332 134 Q 324 140, 315 130" fill="#facc15"/>
+    <path d="M 324 140 Q 338 138, 342 148 Q 330 154, 324 140" fill="#facc15"/>
+    <path d="M 328 155 Q 346 156, 348 168 Q 333 172, 328 155" fill="#facc15"/>
+    <path d="M 329 174 Q 350 178, 350 190 Q 332 192, 329 174" fill="#facc15"/>
+    <path d="M 327 195 Q 350 202, 346 215 Q 328 214, 327 195" fill="#facc15"/>
+    <path d="M 321 217 Q 345 228, 338 240 Q 320 236, 321 217" fill="#facc15"/>
+    <path d="M 314 238 Q 334 252, 325 264 Q 310 256, 314 238" fill="#facc15"/>
+    <path d="M 305 258 Q 322 272, 310 284 Q 298 274, 305 258" fill="#facc15"/>
+  </g>
+
+  <!-- Center Open Book (Al-Qur'an / Kitab Suci) -->
+  <g id="openBook" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.4))">
+    <!-- Base shadow/outline -->
+    <path d="M 160 275 C 200 260, 235 270, 250 295 C 265 270, 300 260, 340 275 L 345 295 C 300 280, 265 290, 250 315 C 235 290, 200 280, 155 295 Z" fill="#0f172a"/>
+    
+    <!-- Left Page Layers -->
+    <path d="M 162 265 C 195 245, 230 252, 248 276 L 248 296 C 230 272, 195 265, 162 285 Z" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <path d="M 165 255 C 198 235, 232 242, 248 266 L 248 286 C 232 262, 198 255, 165 275 Z" fill="#86efac" stroke="#15803d" stroke-width="2"/>
+    
+    <!-- Left page text lines -->
+    <path d="M 178 262 C 198 248, 222 254, 236 270" stroke="#166534" stroke-width="2" fill="none"/>
+    <path d="M 175 270 C 196 256, 220 262, 236 278" stroke="#166534" stroke-width="2" fill="none"/>
+    
+    <!-- Right Page Layers -->
+    <path d="M 338 265 C 305 245, 270 252, 252 276 L 252 296 C 270 272, 305 265, 338 285 Z" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <path d="M 335 255 C 302 235, 268 242, 252 266 L 252 286 C 268 262, 302 255, 335 275 Z" fill="#86efac" stroke="#15803d" stroke-width="2"/>
+    
+    <!-- Right page text lines -->
+    <path d="M 322 262 C 302 248, 278 254, 264 270" stroke="#166534" stroke-width="2" fill="none"/>
+    <path d="M 325 270 C 304 256, 280 262, 264 278" stroke="#166534" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- Bottom Ribbon Banner: IMAN - ISLAM - IHSAN -->
+  <g id="ribbonBanner" filter="drop-shadow(0 3px 5px rgba(0,0,0,0.5))">
+    <!-- Ribbon tails -->
+    <polygon points="120,335 145,315 145,345 110,345" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+    <polygon points="380,335 355,315 355,345 390,345" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+    <!-- Main curved ribbon banner -->
+    <path d="M 135 328 C 200 305, 300 305, 365 328 L 355 358 C 295 335, 205 335, 145 358 Z" fill="#ffffff" stroke="#1e293b" stroke-width="3"/>
+    <!-- Ribbon Text -->
+    <text x="250" y="342" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="900" font-size="14" fill="#0f172a" text-anchor="middle" letter-spacing="2">
+      IMAN - ISLAM - IHSAN
+    </text>
+  </g>
+</svg>
