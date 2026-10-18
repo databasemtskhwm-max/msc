@@ -425,10 +425,10 @@ export function useScoreboard() {
 
         const updatedTeams = [...prev.teams];
         const currentTeam = updatedTeams[teamIndex];
-        const newScore = Math.max(0, currentTeam.score + delta);
+        const newScore = currentTeam.score + delta;
         const roundScores = { ...currentTeam.roundScores };
         const currentRoundKey = targetRoundId || prev.currentRoundId;
-        roundScores[currentRoundKey] = Math.max(0, (roundScores[currentRoundKey] || 0) + delta);
+        roundScores[currentRoundKey] = (roundScores[currentRoundKey] || 0) + delta;
 
         updatedTeams[teamIndex] = {
           ...currentTeam,
@@ -477,10 +477,14 @@ export function useScoreboard() {
         const updatedTeams = [...prev.teams];
         const currentTeam = updatedTeams[teamIndex];
         const delta = newScore - currentTeam.score;
+        const currentRoundKey = prev.currentRoundId;
+        const roundScores = { ...currentTeam.roundScores };
+        roundScores[currentRoundKey] = (roundScores[currentRoundKey] || 0) + delta;
 
         updatedTeams[teamIndex] = {
           ...currentTeam,
           score: newScore,
+          roundScores,
         };
 
         const newHistoryEntry: ScoreHistoryEntry = {

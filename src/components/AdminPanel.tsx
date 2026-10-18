@@ -495,7 +495,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div className="text-right">
-                    <div className="font-mono font-black text-2xl sm:text-3xl text-amber-400">
+                    <div className={`font-mono font-black text-2xl sm:text-3xl ${team.score < 0 ? 'text-rose-400' : 'text-amber-400'}`}>
                       {team.score}
                     </div>
                     <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">

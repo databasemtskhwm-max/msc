@@ -289,12 +289,26 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   {team.name}
                 </h3>
 
-                {/* Giant Total Score Display (Deep Emerald Islamic Green) */}
-                <div className="bg-[#064e3b] text-white rounded-xl py-3 px-2 text-center shadow-inner relative my-2 z-10">
-                  <span className="text-[10px] font-bold tracking-wider text-emerald-200 uppercase block mb-0.5">
+                {/* Giant Total Score Display */}
+                <div
+                  className={`rounded-xl py-3 px-2 text-center shadow-inner relative my-2 z-10 transition-colors ${
+                    team.score < 0
+                      ? 'bg-gradient-to-b from-rose-950 to-rose-900 border border-rose-700/80 text-white'
+                      : 'bg-[#064e3b] text-white'
+                  }`}
+                >
+                  <span
+                    className={`text-[10px] font-bold tracking-wider uppercase block mb-0.5 ${
+                      team.score < 0 ? 'text-rose-200' : 'text-emerald-200'
+                    }`}
+                  >
                     TOTAL AKUMULASI POIN
                   </span>
-                  <div className="text-5xl font-black font-mono tracking-tight text-white leading-none">
+                  <div
+                    className={`text-5xl font-black font-mono tracking-tight leading-none ${
+                      team.score < 0 ? 'text-rose-300' : 'text-white'
+                    }`}
+                  >
                     {team.score.toLocaleString('id-ID')}
                   </div>
                 </div>
@@ -309,7 +323,11 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   {/* Wajib */}
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-1">
                     <div className="text-[9px] font-bold text-slate-600 truncate">Wajib</div>
-                    <div className="font-black text-slate-900 text-xs sm:text-sm mt-0.5">
+                    <div
+                      className={`font-black text-xs sm:text-sm mt-0.5 ${
+                        (team.roundScores['round-wajib'] ?? 0) < 0 ? 'text-rose-600' : 'text-slate-900'
+                      }`}
+                    >
                       {team.roundScores['round-wajib'] ?? 0}
                     </div>
                   </div>
@@ -317,7 +335,11 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   {/* Lemparan (Nilai dari soal wajib yang dilempar) */}
                   <div className="bg-amber-50/80 border border-amber-200/80 rounded-lg p-1">
                     <div className="text-[9px] font-bold text-amber-800 truncate">Lempar</div>
-                    <div className="font-black text-amber-950 text-xs sm:text-sm mt-0.5">
+                    <div
+                      className={`font-black text-xs sm:text-sm mt-0.5 ${
+                        (team.roundScores['round-lemparan'] ?? 0) < 0 ? 'text-rose-600' : 'text-amber-950'
+                      }`}
+                    >
                       {team.roundScores['round-lemparan'] ?? 0}
                     </div>
                   </div>
@@ -325,7 +347,11 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   {/* Penawaran */}
                   <div className="bg-sky-50/80 border border-sky-200/80 rounded-lg p-1">
                     <div className="text-[9px] font-bold text-sky-800 truncate">Tawar</div>
-                    <div className="font-black text-sky-950 text-xs sm:text-sm mt-0.5">
+                    <div
+                      className={`font-black text-xs sm:text-sm mt-0.5 ${
+                        (team.roundScores['round-penawaran'] ?? 0) < 0 ? 'text-rose-600' : 'text-sky-950'
+                      }`}
+                    >
                       {team.roundScores['round-penawaran'] ?? 0}
                     </div>
                   </div>
@@ -333,7 +359,11 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   {/* Rebutan */}
                   <div className="bg-rose-50/80 border border-rose-200/80 rounded-lg p-1">
                     <div className="text-[9px] font-bold text-rose-800 truncate">Rebut</div>
-                    <div className="font-black text-rose-950 text-xs sm:text-sm mt-0.5">
+                    <div
+                      className={`font-black text-xs sm:text-sm mt-0.5 ${
+                        (team.roundScores['round-rebutan'] ?? 0) < 0 ? 'text-rose-600 font-extrabold' : 'text-rose-950'
+                      }`}
+                    >
                       {team.roundScores['round-rebutan'] ?? 0}
                     </div>
                   </div>
@@ -404,7 +434,7 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   {team.name}
                 </div>
                 <div className="text-right mt-1.5">
-                  <span className="font-mono font-black text-sm text-[#064e3b]">
+                  <span className={`font-mono font-black text-sm ${team.score < 0 ? 'text-rose-600 font-extrabold' : 'text-[#064e3b]'}`}>
                     {team.score.toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-500">pt</span>
                   </span>
                 </div>
@@ -479,7 +509,7 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                     <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-700">
                       {team.roundScores['round-rebutan'] ?? 0}
                     </td>
-                    <td className="py-2.5 px-3.5 text-right font-mono font-black text-sm sm:text-base text-[#064e3b]">
+                    <td className={`py-2.5 px-3.5 text-right font-mono font-black text-sm sm:text-base ${team.score < 0 ? 'text-rose-600 font-extrabold' : 'text-[#064e3b]'}`}>
                       {team.score.toLocaleString('id-ID')} Poin
                     </td>
                   </tr>
