@@ -9,9 +9,15 @@ const REALTIME_CHANNEL_NAME = 'msc-live-room';
 let cachedClient: SupabaseClient | null = null;
 let activeRealtimeChannel: RealtimeChannel | null = null;
 
+export function isSupabaseConfiguredFromEnv(): boolean {
+  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL?.trim();
+  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY?.trim();
+  return Boolean(envUrl && envKey);
+}
+
 export function getStoredSupabaseConfig(): SupabaseConfig {
-  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL?.trim() || '';
+  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY?.trim() || '';
 
   if (typeof window === 'undefined') {
     return {
@@ -27,10 +33,12 @@ export function getStoredSupabaseConfig(): SupabaseConfig {
     const raw = localStorage.getItem(SUPABASE_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const finalUrl = envUrl || parsed.url || '';
+      const finalKey = envKey || parsed.anonKey || '';
       return {
-        url: parsed.url || envUrl,
-        anonKey: parsed.anonKey || envKey,
-        autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true,
+        url: finalUrl,
+        anonKey: finalKey,
+        autoSync: parsed.autoSync !== undefined ? parsed.autoSync : Boolean(finalUrl && finalKey),
         isConnected: false,
         lastSyncStatus: 'idle',
         lastSyncMessage: parsed.lastSyncMessage || '',

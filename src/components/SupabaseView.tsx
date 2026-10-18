@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
+import { isSupabaseConfiguredFromEnv } from '../utils/supabaseClient.ts';
 
 interface SupabaseViewProps {
   state: ScoreboardState;
@@ -28,6 +29,7 @@ export const SupabaseView: React.FC<SupabaseViewProps> = ({
   onTriggerSync,
   isSyncing,
 }) => {
+  const isEnvConfigured = isSupabaseConfiguredFromEnv();
   const [url, setUrl] = useState(state.supabase?.url || '');
   const [anonKey, setAnonKey] = useState(state.supabase?.anonKey || '');
   const [autoSync, setAutoSync] = useState(
@@ -199,6 +201,18 @@ ALTER PUBLICATION supabase_realtime ADD TABLE msc_scoreboard_state;`;
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
+
+            {isEnvConfigured && (
+              <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-900 font-bold">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Kredensial otomatis terhubung dari Environment (.env / Vercel)!</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] uppercase font-black shrink-0">
+                  .ENV AKTIF
+                </span>
+              </div>
+            )}
 
             {/* Supabase URL */}
             <div>
