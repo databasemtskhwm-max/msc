@@ -5,6 +5,7 @@ import { StageDisplay } from './components/StageDisplay.tsx';
 import { AdminPanel } from './components/AdminPanel.tsx';
 import { BuzzerView } from './components/BuzzerView.tsx';
 import { GoogleSheetsView } from './components/GoogleSheetsView.tsx';
+import { SupabaseView } from './components/SupabaseView.tsx';
 import { ExportView } from './components/ExportView.tsx';
 import { ApiDocsView } from './components/ApiDocsView.tsx';
 import { BigEventOverlay } from './components/BigEventOverlay.tsx';
@@ -83,6 +84,15 @@ export default function App() {
 
         {currentTab === 'buzzer' && (
           <BuzzerView state={state} onBuzzIn={(teamId) => actions.buzzIn(teamId)} />
+        )}
+
+        {currentTab === 'supabase' && (
+          <SupabaseView
+            state={state}
+            onSaveConfig={(url, anonKey, auto) => actions.saveSupabaseConfig(url, anonKey, auto)}
+            onTriggerSync={() => actions.syncSupabase()}
+            isSyncing={isSyncing}
+          />
         )}
 
         {currentTab === 'sheets' && (

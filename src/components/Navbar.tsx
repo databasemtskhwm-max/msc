@@ -11,6 +11,8 @@ import {
   Maximize2,
   Minimize2,
   Wifi,
+  Database,
+  Zap,
 } from 'lucide-react';
 import { setAudioMuted, getAudioMuted } from '../utils/audio.ts';
 import { MuhsinLogo } from './MuhsinLogo.tsx';
@@ -19,7 +21,7 @@ interface NavbarProps {
   currentTab: string;
   onTabChange: (tab: string) => void;
   isConnected: boolean;
-  connectionType: 'ws' | 'http' | 'channel' | 'sheets' | 'local';
+  connectionType: 'ws' | 'http' | 'channel' | 'sheets' | 'supabase' | 'local';
   competitionTitle: string;
 }
 
@@ -54,7 +56,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'stage', label: 'Papan Skor Panggung', icon: Calendar },
     { id: 'admin', label: 'Panel Juri & Skor', icon: Sliders },
     { id: 'buzzer', label: 'Bel Peserta', icon: BellRing },
-    { id: 'sheets', label: 'Google Sheets Cloud', icon: Sheet },
+    { id: 'supabase', label: 'Database Supabase', icon: Database },
+    { id: 'sheets', label: 'Google Sheets (Opsional)', icon: Sheet },
     { id: 'export', label: 'Ekspor PDF / Excel', icon: FileSpreadsheet },
     { id: 'api', label: 'API Papan Skor', icon: Code2 },
   ];
@@ -90,8 +93,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 />
                 <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                  <Wifi className="w-3 h-3 inline" />
-                  {isConnected ? 'WebSocket Live' : 'Menghubungkan...'}
+                  {connectionType === 'supabase' ? (
+                    <Zap className="w-3 h-3 text-amber-500 fill-current inline" />
+                  ) : (
+                    <Wifi className="w-3 h-3 inline" />
+                  )}
+                  {isConnected
+                    ? connectionType === 'supabase'
+                      ? 'Supabase Realtime'
+                      : connectionType === 'ws'
+                      ? 'WebSocket Live'
+                      : connectionType === 'sheets'
+                      ? 'Sheets Cloud'
+                      : 'Lokal Aktif'
+                    : 'Menghubungkan...'}
                 </span>
               </span>
               <span className="text-slate-300">•</span>

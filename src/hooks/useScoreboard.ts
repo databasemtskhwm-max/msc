@@ -30,6 +30,15 @@ import {
   fetchStateFromGoogleSheets,
   pushStateToGoogleSheets,
 } from '../utils/sheetsSync.ts';
+import {
+  getStoredSupabaseConfig,
+  saveStoredSupabaseConfig,
+  fetchStateFromSupabase,
+  saveStateToSupabase,
+  broadcastStateViaSupabase,
+  subscribeToSupabaseRealtime,
+  testSupabaseConnection,
+} from '../utils/supabaseClient.ts';
 
 const BROADCAST_CHANNEL_NAME = 'msc_live_scoreboard_sync_v2';
 
@@ -42,6 +51,7 @@ export function useScoreboard() {
     // 2. Default fallback session state
     const defaultSess = createDefaultSession();
     const config = getCachedSheetsConfig();
+    const supabaseConfig = getStoredSupabaseConfig();
     return {
       competitionTitle: 'MUHSIN SMART COMPETITION 2026',
       competitionSubtitle: 'Lomba Cerdas Cermat - Tingkat Pelajar & Santri',
@@ -56,6 +66,7 @@ export function useScoreboard() {
       isBuzzerLocked: defaultSess.isBuzzerLocked,
       currentQuestionIndex: 1,
       history: defaultSess.history,
+      supabase: supabaseConfig,
       googleSheets: {
         webhookUrl: config.webhookUrl,
         sheetId: config.sheetId,
@@ -73,7 +84,7 @@ export function useScoreboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastEvent, setLastEvent] = useState<any>(null);
-  const [connectionType, setConnectionType] = useState<'ws' | 'sheets' | 'http' | 'local'>('local');
+  const [connectionType, setConnectionType] = useState<'ws' | 'sheets' | 'supabase' | 'http' | 'local'>('local');
 
   const wsRef = useRef<WebSocket | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -125,9 +136,25 @@ export function useScoreboard() {
     }
   }, []);
 
-  // Fetch state from server or Google Sheets
+  // Fetch state from server, Supabase, or Google Sheets
   const fetchState = useCallback(async () => {
-    // 1. Try local server first (when running locally)
+    // 1. Try Supabase Cloud Database first (Instant cloud sync across devices)
+    const supabaseConfig = getStoredSupabaseConfig();
+    if (supabaseConfig.url && supabaseConfig.anonKey) {
+      try {
+        const supabaseState = await fetchStateFromSupabase();
+        if (supabaseState) {
+          setState(supabaseState);
+          setIsConnected(true);
+          setConnectionType('supabase');
+          return;
+        }
+      } catch (e) {
+        console.warn('Supabase fetch failed, falling back:', e);
+      }
+    }
+
+    // 2. Try local server first (when running locally)
     try {
       const res = await fetch('/api/scoreboard');
       if (res.ok) {
@@ -143,7 +170,7 @@ export function useScoreboard() {
       // Local server not available (e.g., deployed on Vercel)
     }
 
-    // 2. If running on Vercel without local server, try Google Sheets Cloud DB
+    // 3. If running on Vercel without local server, try Google Sheets Cloud DB
     const currentWebhook = stateRef.current?.googleSheets?.webhookUrl || getCachedSheetsConfig().webhookUrl;
     if (currentWebhook) {
       const sheetsState = await fetchStateFromGoogleSheets(currentWebhook);
@@ -154,6 +181,30 @@ export function useScoreboard() {
       }
     }
   }, []);
+
+  // Supabase Realtime Subscription (Sub-millisecond updates across all devices anywhere)
+  useEffect(() => {
+    const unsubscribe = subscribeToSupabaseRealtime((remoteState, extra) => {
+      setState(remoteState);
+      notifyLocalTabs(remoteState, extra);
+      setIsConnected(true);
+      setConnectionType((prev) => (prev === 'ws' ? 'ws' : 'supabase'));
+
+      if (extra) {
+        setLastEvent(extra);
+        if (extra.type === 'BUZZER_RING') playBuzzerSound();
+        else if (extra.type === 'SCORE_CHANGED') {
+          if (Number(extra.delta) >= 0) playCorrectSound();
+          else playWrongSound();
+        } else if (extra.type === 'TIMER_END') playTimesUpSound();
+        else if (extra.type === 'TIMER_TICK' && extra.secondsLeft <= 5) playTimerTick();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [notifyLocalTabs]);
 
   // WebSocket connection logic (for local development)
   useEffect(() => {
@@ -249,7 +300,7 @@ export function useScoreboard() {
     }
   }, []);
 
-  // Update State & synchronize everywhere
+  // Update State & synchronize everywhere (Local Tabs + Supabase Realtime + Sheets)
   const commitStateUpdate = useCallback(
     (
       updater: (prev: ScoreboardState) => ScoreboardState,
@@ -265,6 +316,16 @@ export function useScoreboard() {
         });
 
         notifyLocalTabs(withCommittedSession, extraEvent);
+
+        // Supabase Realtime Broadcast & Cloud Persistence
+        const sbConfig = withCommittedSession.supabase || getStoredSupabaseConfig();
+        if (sbConfig.autoSync && sbConfig.url && sbConfig.anonKey) {
+          broadcastStateViaSupabase(withCommittedSession, extraEvent);
+          saveStateToSupabase(withCommittedSession).catch((err) => {
+            console.warn('[Supabase] background save error:', err);
+          });
+        }
+
         if (syncSheets && connectionType !== 'ws') {
           triggerSheetsPushIfActive(withCommittedSession);
         }
@@ -795,6 +856,55 @@ export function useScoreboard() {
     }
   };
 
+  const saveSupabaseConfig = async (url: string, anonKey: string, autoSync: boolean) => {
+    saveStoredSupabaseConfig({ url, anonKey, autoSync });
+    const test = await testSupabaseConnection(url, anonKey);
+    commitStateUpdate((prev) => ({
+      ...prev,
+      supabase: {
+        url,
+        anonKey,
+        autoSync,
+        isConnected: test.success,
+        lastSyncedAt: test.success ? Date.now() : undefined,
+        lastSyncStatus: test.success ? 'connected' : 'error',
+        lastSyncMessage: test.message,
+      },
+    }));
+
+    if (test.success && autoSync && stateRef.current) {
+      await saveStateToSupabase(stateRef.current);
+      broadcastStateViaSupabase(stateRef.current, { type: 'SUPABASE_CONNECTED' });
+    }
+
+    return test;
+  };
+
+  const syncSupabase = async () => {
+    setIsSyncing(true);
+    try {
+      if (!stateRef.current) return { success: false, message: 'State kosong' };
+      const res = await saveStateToSupabase(stateRef.current);
+      if (res.success) {
+        broadcastStateViaSupabase(stateRef.current, { type: 'MANUAL_SYNC' });
+        commitStateUpdate((prev) => ({
+          ...prev,
+          supabase: {
+            ...(prev.supabase || getStoredSupabaseConfig()),
+            isConnected: true,
+            lastSyncedAt: Date.now(),
+            lastSyncStatus: 'connected',
+            lastSyncMessage: `Sinkronisasi berhasil pada ${new Date().toLocaleTimeString('id-ID')}`,
+          },
+        }));
+        return { success: true, message: 'Data berhasil disinkronkan ke Supabase Cloud!' };
+      }
+      return { success: false, message: res.message || 'Gagal menyimpan ke Supabase.' };
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return {
     state,
     isConnected,
@@ -816,6 +926,8 @@ export function useScoreboard() {
       duplicateSession: duplicateSessionAction,
       deleteSession: deleteSessionAction,
       updateSession: updateSessionAction,
+      syncSupabase,
+      saveSupabaseConfig,
       syncGoogleSheets,
       saveGoogleSheetsConfig,
       resetMatch,

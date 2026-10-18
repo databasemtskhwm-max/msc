@@ -54,6 +54,16 @@ export interface GoogleSheetsConfig {
   lastSyncMessage?: string;
 }
 
+export interface SupabaseConfig {
+  url: string;
+  anonKey: string;
+  autoSync: boolean;
+  isConnected: boolean;
+  lastSyncedAt?: number;
+  lastSyncStatus: 'idle' | 'syncing' | 'connected' | 'error';
+  lastSyncMessage?: string;
+}
+
 export interface TimerState {
   secondsLeft: number;
   totalSeconds: number;
@@ -110,6 +120,7 @@ export interface ScoreboardState {
   isBuzzerLocked: boolean;
   currentQuestionIndex: number;
   history: ScoreHistoryEntry[];
+  supabase?: SupabaseConfig;
   googleSheets: GoogleSheetsConfig;
   apiAccessKey: string;
   activeAnnouncement?: {
