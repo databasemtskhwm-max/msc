@@ -73,45 +73,58 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
 }) => {
   const [lastDeltas, setLastDeltas] = useState<Record<string, { delta: number; key: number }>>({});
   const lastHistoryIdRef = useRef<string | null>(null);
+  const timeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const rankedTeams = useMemo(() => rankTeams(state.teams), [state.teams]);
   const currentRound = state.rounds.find((r) => r.id === state.currentRoundId) || state.rounds[0];
 
-  // Detect genuine score changes only when a new history ID arrives
+  // Detect genuine score changes and trigger glowing flash effect on the team's card
   useEffect(() => {
     if (state.history && state.history.length > 0) {
       const latest = state.history[0];
       if (latest && latest.id && latest.id !== lastHistoryIdRef.current) {
         lastHistoryIdRef.current = latest.id;
         if (latest.teamId && latest.delta !== 0) {
+          const teamId = latest.teamId;
+
+          // Clear previous timeout for this team if any
+          if (timeoutsRef.current[teamId]) {
+            clearTimeout(timeoutsRef.current[teamId]);
+          }
+
           setLastDeltas((prev) => ({
             ...prev,
-            [latest.teamId]: { delta: latest.delta, key: Date.now() },
+            [teamId]: { delta: latest.delta, key: Date.now() },
           }));
 
-          // Automatically clear delta after 3 seconds
-          const timer = setTimeout(() => {
+          // Automatically clear glowing state after 3.2 seconds and return smoothly to normal
+          timeoutsRef.current[teamId] = setTimeout(() => {
             setLastDeltas((prev) => {
               const copy = { ...prev };
-              delete copy[latest.teamId];
+              delete copy[teamId];
               return copy;
             });
-          }, 3000);
+            delete timeoutsRef.current[teamId];
+          }, 3200);
 
           if (latest.delta >= 100) {
             confetti({
-              particleCount: 25,
-              spread: 50,
-              origin: { y: 0.8 },
-              colors: ['#f59e0b', '#047857', '#3b82f6', '#ec4899'],
+              particleCount: 30,
+              spread: 60,
+              origin: { y: 0.75 },
+              colors: ['#f59e0b', '#047857', '#10b981', '#3b82f6'],
             });
           }
-
-          return () => clearTimeout(timer);
         }
       }
     }
   }, [state.history]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(timeoutsRef.current).forEach((t) => clearTimeout(t));
+    };
+  }, []);
 
   const seconds = state.timer.secondsLeft;
   const firstBuzzer = state.buzzerQueue.length > 0 ? state.buzzerQueue[0] : null;
@@ -236,6 +249,9 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
           const isBuzzerFirst = firstBuzzer?.teamId === team.id;
           const floatingDelta = lastDeltas[team.id];
 
+          const isPositiveFlash = Boolean(floatingDelta && floatingDelta.delta > 0);
+          const isNegativeFlash = Boolean(floatingDelta && floatingDelta.delta < 0);
+
           // Determine visual styling from preset or fallback
           const preset = TEAM_DESIGN_PRESETS[team.id] || {
             borderClass: 'border-emerald-600',
@@ -246,24 +262,38 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
           return (
             <div
               key={team.id}
-              className={`bg-white rounded-2xl border-2 ${preset.borderClass} shadow-md p-4 flex flex-col justify-between relative overflow-hidden transition-all duration-200 hover:shadow-lg ${
-                isBuzzerFirst ? 'ring-4 ring-rose-500 scale-[1.02]' : ''
+              className={`rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden transition-all duration-500 shadow-md ${
+                isPositiveFlash
+                  ? 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 border-4 border-emerald-200 ring-4 ring-emerald-400 ring-offset-2 ring-offset-emerald-950 shadow-[0_0_55px_rgba(16,185,129,0.95)] scale-[1.04] z-30 animate-pulse'
+                  : isNegativeFlash
+                  ? 'bg-gradient-to-br from-rose-600 via-rose-700 to-rose-800 border-4 border-rose-200 ring-4 ring-rose-400 ring-offset-2 ring-offset-rose-950 shadow-[0_0_55px_rgba(244,63,94,0.95)] scale-[1.04] z-30 animate-pulse'
+                  : `bg-white border-2 ${preset.borderClass} hover:shadow-lg ${
+                      isBuzzerFirst ? 'ring-4 ring-rose-500 scale-[1.02]' : ''
+                    }`
               }`}
             >
               {/* Subtle background arabesque watermark inside card */}
               <div className="absolute inset-0 pointer-events-none opacity-[0.025] bg-islamic-pattern" />
 
+              {/* Pulsing illuminated radial aura during flash */}
+              {isPositiveFlash && (
+                <div className="absolute inset-0 bg-radial from-emerald-200/40 via-transparent to-transparent pointer-events-none animate-ping duration-1000" />
+              )}
+              {isNegativeFlash && (
+                <div className="absolute inset-0 bg-radial from-rose-200/40 via-transparent to-transparent pointer-events-none animate-ping duration-1000" />
+              )}
+
               {/* Floating Point Delta Animation */}
               {floatingDelta && (
                 <div
                   key={floatingDelta.key}
-                  className={`absolute top-3 right-3 z-20 px-3 py-1 rounded-full font-black text-sm shadow-lg animate-bounce ${
-                    floatingDelta.delta >= 0
-                      ? 'bg-emerald-600 text-white ring-2 ring-emerald-300'
-                      : 'bg-rose-600 text-white ring-2 ring-rose-300'
+                  className={`absolute top-3 right-3 z-30 px-3.5 py-1.5 rounded-full font-black text-sm sm:text-base shadow-2xl animate-bounce ${
+                    floatingDelta.delta > 0
+                      ? 'bg-amber-400 text-slate-950 ring-4 ring-white'
+                      : 'bg-white text-rose-700 ring-4 ring-rose-300'
                   }`}
                 >
-                  {floatingDelta.delta >= 0 ? `+${floatingDelta.delta}` : floatingDelta.delta}
+                  {floatingDelta.delta > 0 ? `+${floatingDelta.delta}` : floatingDelta.delta}
                 </div>
               )}
 
@@ -271,42 +301,72 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                 {/* Header: Team Code Badge + Simple Position Number Badge (Tanpa label Juara) */}
                 <div className="flex items-center justify-between gap-2 mb-2 relative z-10">
                   <span
-                    className={`px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider shadow-2xs ${preset.badgeClass}`}
+                    className={`px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider shadow-2xs ${
+                      isPositiveFlash || isNegativeFlash ? 'bg-white text-slate-950 font-black' : preset.badgeClass
+                    }`}
                   >
                     {team.code}
                   </span>
 
                   {/* Standing Rank Badge (#1, #2, #3, dll. Tanpa label Juara) */}
                   <div className="flex items-center gap-1 font-bold text-xs">
-                    <span className="text-slate-600 font-bold text-xs bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full shadow-2xs font-mono">
+                    <span
+                      className={`font-bold text-xs px-2.5 py-0.5 rounded-full shadow-2xs font-mono border ${
+                        isPositiveFlash || isNegativeFlash
+                          ? 'bg-white/90 text-slate-950 border-white font-black'
+                          : 'text-slate-600 bg-slate-100 border-slate-200'
+                      }`}
+                    >
                       #{rank}
                     </span>
                   </div>
                 </div>
 
                 {/* Team / School Name */}
-                <h3 className="font-black text-slate-900 text-base md:text-lg min-h-[46px] line-clamp-2 leading-snug flex items-center relative z-10">
+                <h3
+                  className={`font-black text-base md:text-lg min-h-[46px] line-clamp-2 leading-snug flex items-center relative z-10 transition-colors ${
+                    isPositiveFlash || isNegativeFlash
+                      ? 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]'
+                      : 'text-slate-900'
+                  }`}
+                >
                   {team.name}
                 </h3>
 
                 {/* Giant Total Score Display */}
                 <div
-                  className={`rounded-xl py-3 px-2 text-center shadow-inner relative my-2 z-10 transition-colors ${
-                    team.score < 0
+                  className={`rounded-xl py-3 px-2 text-center shadow-inner relative my-2 z-10 transition-all duration-300 ${
+                    isPositiveFlash
+                      ? 'bg-emerald-950/90 border-2 border-emerald-300 text-white shadow-2xl'
+                      : isNegativeFlash
+                      ? 'bg-rose-950/90 border-2 border-rose-300 text-white shadow-2xl'
+                      : team.score < 0
                       ? 'bg-gradient-to-b from-rose-950 to-rose-900 border border-rose-700/80 text-white'
                       : 'bg-[#064e3b] text-white'
                   }`}
                 >
                   <span
                     className={`text-[10px] font-bold tracking-wider uppercase block mb-0.5 ${
-                      team.score < 0 ? 'text-rose-200' : 'text-emerald-200'
+                      isPositiveFlash
+                        ? 'text-emerald-200'
+                        : isNegativeFlash
+                        ? 'text-rose-200'
+                        : team.score < 0
+                        ? 'text-rose-200'
+                        : 'text-emerald-200'
                     }`}
                   >
                     TOTAL AKUMULASI POIN
                   </span>
                   <div
                     className={`text-5xl font-black font-mono tracking-tight leading-none ${
-                      team.score < 0 ? 'text-rose-300' : 'text-white'
+                      isPositiveFlash
+                        ? 'text-amber-300 drop-shadow-md'
+                        : isNegativeFlash
+                        ? 'text-white drop-shadow-md'
+                        : team.score < 0
+                        ? 'text-rose-300'
+                        : 'text-white'
                     }`}
                   >
                     {team.score.toLocaleString('id-ID')}
@@ -315,17 +375,55 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
               </div>
 
               {/* Rincian Babak Breakdown (4 Babak Terpisah: Wajib, Lemparan, Penawaran, Rebutan) */}
-              <div className="pt-2 border-t border-slate-100 mt-2 relative z-10">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              <div
+                className={`pt-2 border-t mt-2 relative z-10 transition-colors ${
+                  isPositiveFlash
+                    ? 'border-emerald-400/50'
+                    : isNegativeFlash
+                    ? 'border-rose-400/50'
+                    : 'border-slate-100'
+                }`}
+              >
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 block ${
+                    isPositiveFlash
+                      ? 'text-emerald-100'
+                      : isNegativeFlash
+                      ? 'text-rose-100'
+                      : 'text-slate-500'
+                  }`}
+                >
                   RINCIAN BABAK
                 </span>
                 <div className="grid grid-cols-4 gap-1 text-center font-mono">
                   {/* Wajib */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-1">
-                    <div className="text-[9px] font-bold text-slate-600 truncate">Wajib</div>
+                  <div
+                    className={`rounded-lg p-1 border transition-colors ${
+                      isPositiveFlash
+                        ? 'bg-emerald-900/60 border-emerald-400/40 text-white'
+                        : isNegativeFlash
+                        ? 'bg-rose-900/60 border-rose-400/40 text-white'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div
+                      className={`text-[9px] font-bold truncate ${
+                        isPositiveFlash
+                          ? 'text-emerald-200'
+                          : isNegativeFlash
+                          ? 'text-rose-200'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      Wajib
+                    </div>
                     <div
                       className={`font-black text-xs sm:text-sm mt-0.5 ${
-                        (team.roundScores['round-wajib'] ?? 0) < 0 ? 'text-rose-600' : 'text-slate-900'
+                        isPositiveFlash || isNegativeFlash
+                          ? 'text-white'
+                          : (team.roundScores['round-wajib'] ?? 0) < 0
+                          ? 'text-rose-600'
+                          : 'text-slate-900'
                       }`}
                     >
                       {team.roundScores['round-wajib'] ?? 0}
@@ -333,11 +431,33 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   </div>
 
                   {/* Lemparan (Nilai dari soal wajib yang dilempar) */}
-                  <div className="bg-amber-50/80 border border-amber-200/80 rounded-lg p-1">
-                    <div className="text-[9px] font-bold text-amber-800 truncate">Lempar</div>
+                  <div
+                    className={`rounded-lg p-1 border transition-colors ${
+                      isPositiveFlash
+                        ? 'bg-emerald-900/60 border-emerald-400/40 text-white'
+                        : isNegativeFlash
+                        ? 'bg-rose-900/60 border-rose-400/40 text-white'
+                        : 'bg-amber-50/80 border-amber-200/80'
+                    }`}
+                  >
+                    <div
+                      className={`text-[9px] font-bold truncate ${
+                        isPositiveFlash
+                          ? 'text-emerald-200'
+                          : isNegativeFlash
+                          ? 'text-rose-200'
+                          : 'text-amber-800'
+                      }`}
+                    >
+                      Lempar
+                    </div>
                     <div
                       className={`font-black text-xs sm:text-sm mt-0.5 ${
-                        (team.roundScores['round-lemparan'] ?? 0) < 0 ? 'text-rose-600' : 'text-amber-950'
+                        isPositiveFlash || isNegativeFlash
+                          ? 'text-white'
+                          : (team.roundScores['round-lemparan'] ?? 0) < 0
+                          ? 'text-rose-600'
+                          : 'text-amber-950'
                       }`}
                     >
                       {team.roundScores['round-lemparan'] ?? 0}
@@ -345,11 +465,33 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   </div>
 
                   {/* Penawaran */}
-                  <div className="bg-sky-50/80 border border-sky-200/80 rounded-lg p-1">
-                    <div className="text-[9px] font-bold text-sky-800 truncate">Tawar</div>
+                  <div
+                    className={`rounded-lg p-1 border transition-colors ${
+                      isPositiveFlash
+                        ? 'bg-emerald-900/60 border-emerald-400/40 text-white'
+                        : isNegativeFlash
+                        ? 'bg-rose-900/60 border-rose-400/40 text-white'
+                        : 'bg-sky-50/80 border-sky-200/80'
+                    }`}
+                  >
+                    <div
+                      className={`text-[9px] font-bold truncate ${
+                        isPositiveFlash
+                          ? 'text-emerald-200'
+                          : isNegativeFlash
+                          ? 'text-rose-200'
+                          : 'text-sky-800'
+                      }`}
+                    >
+                      Tawar
+                    </div>
                     <div
                       className={`font-black text-xs sm:text-sm mt-0.5 ${
-                        (team.roundScores['round-penawaran'] ?? 0) < 0 ? 'text-rose-600' : 'text-sky-950'
+                        isPositiveFlash || isNegativeFlash
+                          ? 'text-white'
+                          : (team.roundScores['round-penawaran'] ?? 0) < 0
+                          ? 'text-rose-600'
+                          : 'text-sky-950'
                       }`}
                     >
                       {team.roundScores['round-penawaran'] ?? 0}
@@ -357,11 +499,33 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   </div>
 
                   {/* Rebutan */}
-                  <div className="bg-rose-50/80 border border-rose-200/80 rounded-lg p-1">
-                    <div className="text-[9px] font-bold text-rose-800 truncate">Rebut</div>
+                  <div
+                    className={`rounded-lg p-1 border transition-colors ${
+                      isPositiveFlash
+                        ? 'bg-emerald-900/60 border-emerald-400/40 text-white'
+                        : isNegativeFlash
+                        ? 'bg-rose-900/60 border-rose-400/40 text-white'
+                        : 'bg-rose-50/80 border-rose-200/80'
+                    }`}
+                  >
+                    <div
+                      className={`text-[9px] font-bold truncate ${
+                        isPositiveFlash
+                          ? 'text-emerald-200'
+                          : isNegativeFlash
+                          ? 'text-rose-200'
+                          : 'text-rose-800'
+                      }`}
+                    >
+                      Rebut
+                    </div>
                     <div
                       className={`font-black text-xs sm:text-sm mt-0.5 ${
-                        (team.roundScores['round-rebutan'] ?? 0) < 0 ? 'text-rose-600 font-extrabold' : 'text-rose-950'
+                        isPositiveFlash || isNegativeFlash
+                          ? 'text-white font-extrabold'
+                          : (team.roundScores['round-rebutan'] ?? 0) < 0
+                          ? 'text-rose-600 font-extrabold'
+                          : 'text-rose-950'
                       }`}
                     >
                       {team.roundScores['round-rebutan'] ?? 0}
