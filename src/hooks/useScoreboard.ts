@@ -22,6 +22,7 @@ import {
   duplicateSession,
   deleteSession,
 } from '../utils/sessionLogic.ts';
+import { createBigEventOverlay } from '../utils/scoringLogic.ts';
 import {
   getCachedLocalState,
   saveCachedLocalState,
@@ -90,6 +91,7 @@ export function useScoreboard() {
   const channelRef = useRef<BroadcastChannel | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const stateRef = useRef<ScoreboardState | null>(state);
+  const lastTickTimeRef = useRef<number>(0);
 
   // Keep stateRef synchronized
   useEffect(() => {
@@ -107,7 +109,12 @@ export function useScoreboard() {
         channelRef.current = bc;
         bc.onmessage = (event) => {
           if (event.data && event.data.type === 'LOCAL_STATE_UPDATE') {
-            setState(event.data.payload);
+            if (event.data.extra?.type === 'TIMER_TICK') {
+              lastTickTimeRef.current = Date.now();
+              setState((prev) => (prev ? { ...prev, timer: event.data.payload.timer } : event.data.payload));
+            } else {
+              setState(event.data.payload);
+            }
             setConnectionType((prev) => (prev === 'ws' ? 'ws' : 'local'));
           }
         };
@@ -185,7 +192,12 @@ export function useScoreboard() {
   // Supabase Realtime Subscription (Sub-millisecond updates across all devices anywhere)
   useEffect(() => {
     const unsubscribe = subscribeToSupabaseRealtime((remoteState, extra) => {
-      setState(remoteState);
+      if (extra?.type === 'TIMER_TICK') {
+        lastTickTimeRef.current = Date.now();
+        setState((prev) => (prev ? { ...prev, timer: remoteState.timer } : remoteState));
+      } else {
+        setState(remoteState);
+      }
       notifyLocalTabs(remoteState, extra);
       setIsConnected(true);
       setConnectionType((prev) => (prev === 'ws' ? 'ws' : 'supabase'));
@@ -228,19 +240,18 @@ export function useScoreboard() {
           try {
             const data = JSON.parse(event.data);
             if (data.type === 'STATE_UPDATE' && data.payload) {
-              setState((prevState) => {
-                if (
-                  prevState &&
-                  data.extra?.type === 'TIMER_TICK' &&
-                  prevState.lastUpdated === data.payload.lastUpdated
-                ) {
+              if (data.extra?.type === 'TIMER_TICK') {
+                lastTickTimeRef.current = Date.now();
+                setState((prevState) => {
+                  if (!prevState) return data.payload;
                   return {
                     ...prevState,
                     timer: data.payload.timer,
                   };
-                }
-                return data.payload;
-              });
+                });
+              } else {
+                setState(data.payload);
+              }
 
               if (data.extra?.type !== 'TIMER_TICK') {
                 notifyLocalTabs(data.payload, data.extra);
@@ -290,6 +301,75 @@ export function useScoreboard() {
       if (wsRef.current) wsRef.current.close();
     };
   }, [fetchState, notifyLocalTabs]);
+
+  // Client-side authoritative countdown interval (works standalone, Vercel, Supabase, offline)
+  useEffect(() => {
+    if (!state?.timer.isRunning) return;
+
+    const interval = setInterval(() => {
+      // If a tick arrived from server or remote within last 1200ms, don't double tick
+      if (Date.now() - lastTickTimeRef.current < 1200) {
+        return;
+      }
+
+      setState((prev) => {
+        if (!prev || !prev.timer.isRunning) return prev;
+
+        const currentSec = prev.timer.secondsLeft;
+        if (currentSec <= 1) {
+          // Time's up!
+          playTimesUpSound();
+          const currentRound = prev.rounds.find((r) => r.id === prev.currentRoundId);
+          const nextState: ScoreboardState = {
+            ...prev,
+            timer: {
+              ...prev.timer,
+              secondsLeft: 0,
+              isRunning: false,
+            },
+            bigEventOverlay: createBigEventOverlay('timer_zero', {
+              roundName: currentRound?.name || 'Babak Ini',
+              customTitle: 'WAKTU HABIS!',
+              customSubtitle: 'Waktu menjawab soal pada babak ini telah habis.',
+            }),
+            activeAnnouncement: {
+              id: 'timeup-' + Date.now(),
+              type: 'info',
+              message: 'Waktu Habis!',
+              timestamp: Date.now(),
+            },
+            lastUpdated: Date.now(),
+          };
+
+          lastTickTimeRef.current = Date.now();
+          notifyLocalTabs(nextState, { type: 'TIMER_END' });
+          if (nextState.supabase?.isConnected) {
+            broadcastStateViaSupabase(nextState, { type: 'TIMER_END' });
+          }
+          return nextState;
+        }
+
+        const nextSec = currentSec - 1;
+        if (nextSec <= 5) {
+          playTimerTick();
+        }
+
+        const nextState: ScoreboardState = {
+          ...prev,
+          timer: {
+            ...prev.timer,
+            secondsLeft: nextSec,
+          },
+        };
+
+        lastTickTimeRef.current = Date.now();
+        notifyLocalTabs(nextState, { type: 'TIMER_TICK', secondsLeft: nextSec });
+        return nextState;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [state?.timer.isRunning, state?.currentRoundId, notifyLocalTabs]);
 
 
 
@@ -438,28 +518,45 @@ export function useScoreboard() {
     action: 'start' | 'pause' | 'reset' | 'set' | 'adjust',
     seconds?: number
   ) => {
-    commitStateUpdate((prev) => {
-      let secondsLeft = prev.timer.secondsLeft;
-      let totalSeconds = prev.timer.totalSeconds;
-      let isRunning = prev.timer.isRunning;
+    commitStateUpdate(
+      (prev) => {
+        let secondsLeft = prev.timer.secondsLeft;
+        let totalSeconds = prev.timer.totalSeconds;
+        let isRunning = prev.timer.isRunning;
 
-      if (action === 'start') {
-        isRunning = true;
-      } else if (action === 'pause') {
-        isRunning = false;
-      } else if (action === 'reset') {
-        isRunning = false;
-        secondsLeft = totalSeconds;
-      } else if (action === 'set' && seconds !== undefined) {
-        totalSeconds = seconds;
-        secondsLeft = seconds;
-      }
+        if (action === 'start') {
+          if (secondsLeft <= 0) {
+            const currentRound = prev.rounds.find((r) => r.id === prev.currentRoundId);
+            const defSec = currentRound?.defaultTimerSeconds || 15;
+            secondsLeft = totalSeconds > 0 ? totalSeconds : defSec;
+            totalSeconds = secondsLeft;
+          }
+          isRunning = true;
+        } else if (action === 'pause') {
+          isRunning = false;
+        } else if (action === 'reset') {
+          isRunning = false;
+          const currentRound = prev.rounds.find((r) => r.id === prev.currentRoundId);
+          const defSec = currentRound?.defaultTimerSeconds || 15;
+          const target = seconds !== undefined ? seconds : (totalSeconds > 0 ? totalSeconds : defSec);
+          secondsLeft = target;
+          totalSeconds = target;
+        } else if (action === 'set' && seconds !== undefined) {
+          totalSeconds = seconds;
+          secondsLeft = seconds;
+          isRunning = false;
+        } else if (action === 'adjust' && seconds !== undefined) {
+          secondsLeft = Math.max(0, secondsLeft + seconds);
+        }
 
-      return {
-        ...prev,
-        timer: { secondsLeft, totalSeconds, isRunning },
-      };
-    }, undefined, false);
+        return {
+          ...prev,
+          timer: { secondsLeft, totalSeconds, isRunning },
+        };
+      },
+      { type: 'TIMER_CONTROL', action, seconds },
+      false
+    );
 
     try {
       await fetch('/api/timer/control', {

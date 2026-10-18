@@ -5,9 +5,6 @@ import {
   Trophy,
   Clock,
   BellRing,
-  Play,
-  Pause,
-  RotateCcw,
   Settings,
   Calendar,
   Sparkles,
@@ -172,46 +169,28 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
             </p>
           </div>
 
-          {/* Column 3: Dedicated Authoritative Timer */}
-          <div className="border-2 border-emerald-500/70 bg-white rounded-2xl p-4 flex flex-col items-center justify-between min-w-[210px] w-full sm:w-auto shadow-xs">
+          {/* Column 3: Dedicated Authoritative Timer (Passive Stage Clock - Exclusively Controlled from Admin) */}
+          <div className="border-2 border-emerald-500/70 bg-white rounded-2xl p-4 flex flex-col items-center justify-center min-w-[210px] w-full sm:w-auto shadow-xs">
             <div className="flex items-center gap-3">
-              <Clock className="w-8 h-8 text-emerald-800 stroke-[2.5]" />
+              <Clock className={`w-8 h-8 stroke-[2.5] ${state.timer.isRunning ? 'text-amber-500 animate-pulse' : 'text-emerald-800'}`} />
               <div className="flex flex-col items-start leading-none">
-                <span className="text-4xl md:text-5xl font-black tracking-tight font-mono text-emerald-950">
+                <span className={`text-4xl md:text-5xl font-black tracking-tight font-mono ${state.timer.secondsLeft <= 5 && state.timer.isRunning ? 'text-rose-600 animate-ping' : 'text-emerald-950'}`}>
                   {formatTimer(seconds)}
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mt-1">
-                  {state.timer.isRunning ? 'TIMER BERJALAN' : 'TIMER JEDA'}
-                </span>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className={`w-2 h-2 rounded-full ${state.timer.isRunning ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
+                    {state.timer.isRunning ? 'TIMER BERJALAN' : 'TIMER SIAP / JEDA'}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Quick Timer Controls for Presenter / Operator */}
-            {onTimerAction && (
-              <div className="flex items-center gap-2 mt-3 w-full justify-center">
-                <button
-                  onClick={() => onTimerAction(state.timer.isRunning ? 'pause' : 'start')}
-                  className="px-4 py-1.5 text-xs font-bold rounded-lg bg-[#064e3b] hover:bg-[#065f46] text-white flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-                >
-                  {state.timer.isRunning ? (
-                    <>
-                      <Pause className="w-3.5 h-3.5 text-amber-400" /> Jeda
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3.5 h-3.5 text-emerald-300" /> Mulai
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => onTimerAction('reset')}
-                  className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 flex items-center gap-1 transition cursor-pointer"
-                  title="Reset timer ke nilai default babak"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" /> Reset
-                </button>
-              </div>
-            )}
+            {/* Authoritative Badge Indicating Exclusive Admin Control */}
+            <div className="mt-2.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200/90 text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+              <span className="text-emerald-700 font-bold">●</span>
+              <span>Kontrol resmi di Panel Admin</span>
+            </div>
           </div>
         </div>
       </div>

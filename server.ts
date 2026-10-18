@@ -310,6 +310,12 @@ async function startServer() {
   let timerInterval: NodeJS.Timeout | null = null;
 
   function startTimer() {
+    if (state.timer.secondsLeft <= 0) {
+      const currentRound = state.rounds.find((r) => r.id === state.currentRoundId);
+      const targetSeconds = state.timer.totalSeconds > 0 ? state.timer.totalSeconds : (currentRound?.defaultTimerSeconds ?? 15);
+      state.timer.secondsLeft = targetSeconds;
+      state.timer.totalSeconds = targetSeconds;
+    }
     if (state.timer.isRunning) return;
     state.timer.isRunning = true;
     broadcastState();
@@ -361,7 +367,7 @@ async function startServer() {
   function resetTimer(seconds?: number) {
     pauseTimer();
     const currentRound = state.rounds.find((r) => r.id === state.currentRoundId);
-    const targetSeconds = seconds ?? currentRound?.defaultTimerSeconds ?? 15;
+    const targetSeconds = seconds ?? (state.timer.totalSeconds > 0 ? state.timer.totalSeconds : (currentRound?.defaultTimerSeconds ?? 15));
     state.timer.secondsLeft = targetSeconds;
     state.timer.totalSeconds = targetSeconds;
     state.timer.isRunning = false;

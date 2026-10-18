@@ -32,7 +32,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   connectionType,
 }) => {
   const [muted, setMuted] = useState(getAudioMuted());
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(() =>
+    typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false
+  );
+
+  React.useEffect(() => {
+    const handleFs = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFs);
+    return () => document.removeEventListener('fullscreenchange', handleFs);
+  }, []);
 
   const toggleSound = () => {
     const next = !muted;

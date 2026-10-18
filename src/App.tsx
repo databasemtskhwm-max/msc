@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useScoreboard } from './hooks/useScoreboard.ts';
 import { Navbar } from './components/Navbar.tsx';
 import { StageDisplay } from './components/StageDisplay.tsx';
@@ -10,12 +10,37 @@ import { ExportView } from './components/ExportView.tsx';
 import { ApiDocsView } from './components/ApiDocsView.tsx';
 import { BigEventOverlay } from './components/BigEventOverlay.tsx';
 import { IslamicDecorations } from './components/IslamicDecorations.tsx';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Minimize2 } from 'lucide-react';
 import { MuhsinLogo } from './components/MuhsinLogo.tsx';
 
 export default function App() {
   const { state, isConnected, isSyncing, connectionType, actions } = useScoreboard();
   const [currentTab, setCurrentTab] = useState<string>('stage');
+  const [isFullscreen, setIsFullscreen] = useState(() =>
+    typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false
+  );
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && document.fullscreenElement) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   if (!state) {
     return (
@@ -40,17 +65,35 @@ export default function App() {
       {/* Authentic Islamic Corner Geometric Motifs */}
       <IslamicDecorations />
 
-      {/* Top Navigation */}
-      <Navbar
-        currentTab={currentTab}
-        onTabChange={setCurrentTab}
-        isConnected={isConnected}
-        connectionType={connectionType}
-        competitionTitle={state.competitionTitle}
-      />
+      {/* Top Navigation - Automatically hidden in Fullscreen mode (reappears when pressing ESC) */}
+      {!isFullscreen && (
+        <Navbar
+          currentTab={currentTab}
+          onTabChange={setCurrentTab}
+          isConnected={isConnected}
+          connectionType={connectionType}
+          competitionTitle={state.competitionTitle}
+        />
+      )}
+
+      {/* Floating Exit Fullscreen pill when in fullscreen mode */}
+      {isFullscreen && (
+        <button
+          onClick={() => {
+            if (document.exitFullscreen) {
+              document.exitFullscreen().catch(() => {});
+            }
+          }}
+          className="fixed top-3 right-3 z-50 bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md border border-slate-700 shadow-xl flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity cursor-pointer group"
+          title="Keluar Layar Penuh (ESC)"
+        >
+          <Minimize2 className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+          <span>Keluar Layar Penuh (ESC)</span>
+        </button>
+      )}
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-5 md:p-6 relative z-10">
+      <main className={`flex-1 w-full mx-auto p-3.5 sm:p-5 md:p-6 relative z-10 ${isFullscreen ? 'max-w-none' : 'max-w-7xl'}`}>
         {currentTab === 'stage' && (
           <StageDisplay
             state={state}
