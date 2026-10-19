@@ -242,7 +242,7 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="bg-amber-400 text-slate-950 font-black text-xs uppercase px-3 py-0.5 rounded-full shadow-xs">
-                  🏆 BERHAK MENJAWAB (BEL TERCEPAT)
+                  🏆 BERHAK MENJAWAB (PELEMPARAN JAWABAN)
                 </span>
                 <span className="text-amber-200 text-xs font-mono font-bold">+0.00 detik</span>
               </div>
@@ -295,12 +295,19 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   : isNegativeFlash
                   ? 'bg-gradient-to-br from-rose-600 via-rose-700 to-rose-800 border-4 border-rose-200 ring-4 ring-rose-400 ring-offset-2 ring-offset-rose-950 shadow-[0_0_55px_rgba(244,63,94,0.95)] scale-[1.04] z-30 animate-pulse'
                   : isBuzzerFirst
-                  ? 'bg-white border-4 border-amber-400 ring-8 ring-amber-400 shadow-[0_0_55px_rgba(245,158,11,0.95)] scale-[1.03] z-30 animate-pulse'
+                  ? 'bg-white border-4 border-amber-400 ring-8 ring-amber-400 ring-offset-2 ring-offset-slate-900 shadow-[0_0_65px_rgba(245,158,11,1)] scale-[1.06] z-30 animate-pulse'
+                  : firstBuzzer
+                  ? `bg-white/85 border-2 ${preset.borderClass} opacity-40 grayscale-[25%] scale-[0.98]`
                   : `bg-white border-2 ${preset.borderClass} hover:shadow-lg`
               }`}
             >
               {/* Subtle background arabesque watermark inside card */}
               <div className="absolute inset-0 pointer-events-none opacity-[0.025] bg-islamic-pattern" />
+
+              {/* Pulsing illuminated radial aura during buzzer focus */}
+              {isBuzzerFirst && (
+                <div className="absolute inset-0 bg-radial from-amber-400/25 via-amber-200/10 to-transparent pointer-events-none animate-pulse" />
+              )}
 
               {/* Pulsing illuminated radial aura during flash */}
               {isPositiveFlash && (
@@ -314,7 +321,7 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
               {floatingDelta && (
                 <div
                   key={floatingDelta.key}
-                  className={`absolute top-3 right-3 z-30 px-3.5 py-1.5 rounded-full font-black text-sm sm:text-base shadow-2xl animate-bounce ${
+                  className={`absolute top-3.5 right-3.5 z-30 px-3.5 py-1.5 rounded-full font-black text-sm sm:text-base shadow-2xl animate-bounce ${
                     floatingDelta.delta > 0
                       ? 'bg-amber-400 text-slate-950 ring-4 ring-white'
                       : 'bg-white text-rose-700 ring-4 ring-rose-300'
@@ -330,6 +337,8 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   className={`font-black text-xs px-2.5 py-1 rounded-full shadow-xs font-mono border ${
                     isPositiveFlash || isNegativeFlash
                       ? 'bg-white/95 text-slate-950 border-white font-black shadow-md'
+                      : isBuzzerFirst
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-md'
                       : 'text-slate-600 bg-slate-100/95 border-slate-200'
                   }`}
                 >
@@ -344,6 +353,8 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                     className={`px-6 py-2 rounded-2xl text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-wider shadow-md inline-flex items-center justify-center gap-2 ${
                       isPositiveFlash || isNegativeFlash
                         ? 'bg-white text-slate-950 font-black ring-4 ring-white/50'
+                        : isBuzzerFirst
+                        ? 'bg-amber-400 text-slate-950 font-black ring-4 ring-amber-300 shadow-xl animate-pulse'
                         : preset.badgeClass
                     }`}
                   >
@@ -352,9 +363,9 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
 
                   {/* Fast Buzzer Highlight Badge */}
                   {isBuzzerFirst && (
-                    <span className="mt-2 px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs shadow-md animate-bounce flex items-center gap-1.5">
-                      <BellRing className="w-3.5 h-3.5" />
-                      <span>BERHAK MENJAWAB</span>
+                    <span className="mt-2 px-3.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs shadow-lg animate-bounce flex items-center gap-1.5 ring-2 ring-amber-300">
+                      <BellRing className="w-3.5 h-3.5 animate-spin" />
+                      <span>BERHAK MENJAWAB (PELEMPARAN)</span>
                     </span>
                   )}
                 </div>

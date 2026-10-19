@@ -360,6 +360,7 @@ export function useScoreboard() {
               secondsLeft: 0,
               isRunning: false,
             },
+            isBuzzerLocked: prev.buzzerQueue.length > 0 ? prev.isBuzzerLocked : false,
             bigEventOverlay: createBigEventOverlay('timer_zero', {
               roundName: currentRound?.name || 'Babak Ini',
               customTitle: 'WAKTU HABIS!',
@@ -373,6 +374,13 @@ export function useScoreboard() {
             },
             lastUpdated: Date.now(),
           };
+
+          // Auto-clear overlay tepat 1 detik (1000ms) di sisi client
+          setTimeout(() => {
+            if (stateRef.current?.bigEventOverlay?.type === 'timer_zero') {
+              setState({ ...stateRef.current, bigEventOverlay: null });
+            }
+          }, 1000);
 
           lastTickTimeRef.current = Date.now();
           notifyLocalTabs(nextState, { type: 'TIMER_END' });

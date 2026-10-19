@@ -330,6 +330,10 @@ async function startServer() {
         state.timer.secondsLeft -= 1;
         if (state.timer.secondsLeft === 0) {
           state.timer.isRunning = false;
+          // Jika belum ada yang menekan bel, buka bel agar peserta bisa rebutan pelemparan jawaban
+          if (state.buzzerQueue.length === 0) {
+            state.isBuzzerLocked = false;
+          }
           const currentRound = state.rounds.find((r) => r.id === state.currentRoundId);
           state.bigEventOverlay = createBigEventOverlay('timer_zero', {
             roundName: currentRound?.name || 'Babak Ini',
@@ -344,6 +348,14 @@ async function startServer() {
           };
           if (timerInterval) clearInterval(timerInterval);
           broadcastState({ type: 'TIMER_END' });
+
+          // Auto-clear overlay tepat 1 detik (1000ms) di sisi server & broadcast dismiss
+          setTimeout(() => {
+            if (state.bigEventOverlay?.type === 'timer_zero') {
+              state.bigEventOverlay = null;
+              broadcastState({ type: 'BIG_EVENT_DISMISS' });
+            }
+          }, 1000);
         } else {
           broadcastState({ type: 'TIMER_TICK', secondsLeft: state.timer.secondsLeft });
         }

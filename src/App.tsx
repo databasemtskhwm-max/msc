@@ -153,8 +153,15 @@ export default function App() {
       </main>
 
       {/* Big Event Visual Alert Overlay (Tension & Celebration) */}
+      {/* Popup habis waktu (timer_zero) HANYA ditampilkan di layar papan skor panggung (stage), tidak mengganggu admin / tablet bel */}
       <BigEventOverlay
-        event={state.bigEventOverlay ?? null}
+        event={
+          state.bigEventOverlay?.type === 'timer_zero'
+            ? currentTab === 'stage'
+              ? state.bigEventOverlay
+              : null
+            : (state.bigEventOverlay ?? null)
+        }
         onDismiss={actions.dismissBigEvent}
       />
 

@@ -28,7 +28,14 @@ export const BigEventOverlay: React.FC<BigEventOverlayProps> = ({ event, onDismi
     if (event.type === 'timer_zero') {
       playTimesUpSound();
       playTensionWarningSound();
-      setCountdown(8);
+      setCountdown(1);
+
+      // Auto dismiss after exactly 1 second (1000ms) for timer_zero
+      const timer = setTimeout(() => {
+        onDismiss();
+      }, 1000);
+
+      return () => clearTimeout(timer);
     } else if (event.type === 'round_winner' || event.type === 'match_champion') {
       playFanfareSound();
       // Continuous celebratory confetti
@@ -57,21 +64,21 @@ export const BigEventOverlay: React.FC<BigEventOverlayProps> = ({ event, onDismi
       };
       frame();
       setCountdown(12);
+
+      // Auto dismiss interval for celebrations
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            onDismiss();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
     }
-
-    // Auto dismiss interval
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          onDismiss();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
   }, [event, onDismiss]);
 
   if (!event) return null;
@@ -218,7 +225,15 @@ export const BigEventOverlay: React.FC<BigEventOverlayProps> = ({ event, onDismi
         {/* Footer Action & Auto-Dismiss Counter */}
         <div className="mt-8 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-xs font-mono text-slate-400">
-            Menutup otomatis dalam <strong className="text-white">{countdown}</strong> detik...
+            {isTimerZero ? (
+              <span className="text-rose-400 font-bold animate-pulse">
+                Menutup otomatis (1 detik) → Langsung fokus pelemparan bel
+              </span>
+            ) : (
+              <>
+                Menutup otomatis dalam <strong className="text-white">{countdown}</strong> detik...
+              </>
+            )}
           </span>
 
           <button
@@ -229,7 +244,7 @@ export const BigEventOverlay: React.FC<BigEventOverlayProps> = ({ event, onDismi
                 : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/30'
             }`}
           >
-            Lanjutkan Pertandingan
+            {isTimerZero ? 'Fokus Pelemparan Bel' : 'Lanjutkan Pertandingan'}
           </button>
         </div>
       </div>
