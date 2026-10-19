@@ -53,10 +53,22 @@ export function getAudioMuted(): boolean {
   return isMuted;
 }
 
+let activeBuzzerController: { stop: () => void } | null = null;
+
+export function stopBuzzerSound() {
+  if (activeBuzzerController) {
+    try {
+      activeBuzzerController.stop();
+    } catch (_) {}
+    activeBuzzerController = null;
+  }
+}
+
 /**
- * Authentic Indonesian Cerdas Cermat Horn & Resonant Bell ("Klakson & Lonceng Cerdas Cermat")
- * Menggabungkan semburan klakson kuis dual-tone yang tegas dan bertenaga dengan dentang lonceng
- * tembaga panggung yang nyaring, bergema, dan berbunyi jauh lebih keras ("lebih keras lagi kaya lonceng").
+ * Authentic Indonesian Lonceng Alarm Cerdas Cermat (Electric School/Fire Alarm Bell)
+ * Menghasilkan bunyi lonceng alarm listrik mekanis ("KRIIIIINNNNNGGGGGG") yang sangat keras,
+ * bergetar cepat (~20 Hz pukulan palu pada kubah lonceng kuningan), berbunyi selama 5 detik penuh,
+ * dan dapat dihentikan seketika jika Juri melakukan Reset Bel.
  */
 export function playBuzzerSound() {
   if (isMuted) return;
@@ -68,125 +80,136 @@ export function playBuzzerSound() {
       ctx.resume().catch(() => {});
     }
 
-    const now = ctx.currentTime;
+    // Hentikan suara bel aktif sebelumnya jika ada
+    stopBuzzerSound();
 
-    // Master Dynamics Compressor: Memaksimalkan volume audio panggung agar sangat keras
-    // tanpa terjadi distorsi digital clipping (0 dBFS ceiling)
+    const now = ctx.currentTime;
+    const totalDuration = 5.0; // Durasi bunyi tepat 5 detik sesuai permintaan!
+    const strikeEnd = 4.75;    // Palu alarm berhenti di 4.75s, gema lonceng meluruh halus sampai 5.0s
+
+    // Master Dynamics Compressor: Memaksimalkan volume alarm agar sangat keras dan tembus
+    // di speaker aula/panggung tanpa distorsi digital clipping (0 dBFS ceiling)
     const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.setValueAtTime(-10, now);
+    compressor.threshold.setValueAtTime(-14, now);
     compressor.knee.setValueAtTime(4, now);
     compressor.ratio.setValueAtTime(16, now);
     compressor.attack.setValueAtTime(0.002, now);
-    compressor.release.setValueAtTime(0.12, now);
+    compressor.release.setValueAtTime(0.08, now);
 
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.95, now); // Output volume maksimal dan bertenaga
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(0.95, now + 0.02); // Lonjakan instan bertenaga
+    masterGain.gain.setValueAtTime(0.95, now + strikeEnd);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + totalDuration);
 
     compressor.connect(masterGain);
     masterGain.connect(ctx.destination);
 
-    // ==========================================
-    // 1. KOMPONEN KLAKSON (Dual-Tone Stadium/Quiz Horn Blast)
-    // ==========================================
-    const hornDuration = 0.48;
-    const hornGain = ctx.createGain();
-    hornGain.gain.setValueAtTime(0, now);
-    hornGain.gain.linearRampToValueAtTime(0.70, now + 0.006); // Serangan cepat & bertenaga
-    hornGain.gain.setValueAtTime(0.70, now + hornDuration - 0.06);
-    hornGain.gain.exponentialRampToValueAtTime(0.001, now + hornDuration);
-
-    // WaveShaper Distortion untuk karakter serak khas klakson elektromekanis
-    const hornDistortion = ctx.createWaveShaper();
-    const nSamples = 1024;
-    const curve = new Float32Array(nSamples);
-    const k = 12;
-    for (let i = 0; i < nSamples; ++i) {
-      const x = (i * 2) / nSamples - 1;
-      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
-    }
-    hornDistortion.curve = curve;
-    hornDistortion.oversample = '2x';
-
-    // Frekuensi Klakson: Akor A4 (440 Hz) + C#5 (554.37 Hz) + sub-bass A3 (220 Hz)
-    const hornOsc1 = ctx.createOscillator();
-    hornOsc1.type = 'sawtooth';
-    hornOsc1.frequency.setValueAtTime(440.0, now);
-
-    const hornOsc2 = ctx.createOscillator();
-    hornOsc2.type = 'sawtooth';
-    hornOsc2.frequency.setValueAtTime(554.37, now);
-
-    const hornOsc3 = ctx.createOscillator();
-    hornOsc3.type = 'square';
-    hornOsc3.frequency.setValueAtTime(440.0, now);
-
-    const hornOscSub = ctx.createOscillator();
-    hornOscSub.type = 'sawtooth';
-    hornOscSub.frequency.setValueAtTime(220.0, now);
-
-    const hornFilter = ctx.createBiquadFilter();
-    hornFilter.type = 'peaking';
-    hornFilter.frequency.setValueAtTime(1100, now);
-    hornFilter.gain.setValueAtTime(5, now);
-    hornFilter.Q.setValueAtTime(1.4, now);
-
-    hornOsc1.connect(hornDistortion);
-    hornOsc2.connect(hornDistortion);
-    hornOsc3.connect(hornDistortion);
-    hornOscSub.connect(hornDistortion);
-    hornDistortion.connect(hornFilter);
-    hornFilter.connect(hornGain);
-    hornGain.connect(compressor);
-
-    hornOsc1.start(now);
-    hornOsc2.start(now);
-    hornOsc3.start(now);
-    hornOscSub.start(now);
-
-    hornOsc1.stop(now + hornDuration);
-    hornOsc2.stop(now + hornDuration);
-    hornOsc3.stop(now + hornDuration);
-    hornOscSub.stop(now + hornDuration);
+    const oscillatorsToClean: OscillatorNode[] = [];
 
     // ==========================================
-    // 2. KOMPONEN LONCENG (Loud Ringing Brass Competition Bell)
+    // 1. MODULASI PALU LONCENG ALISTIK (20 Hz Striker Clapper)
+    // Menghasilkan efek getaran dentang mekanis cepat "KRIIIIINNNNGGGG"
     // ==========================================
-    const bellDuration = 1.35; // Ekor dengung gema lonceng yang panjang
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sawtooth';
+    lfo.frequency.setValueAtTime(20, now); // 20 pukulan palu per detik
 
-    const bellGain = ctx.createGain();
-    bellGain.gain.setValueAtTime(0, now);
-    bellGain.gain.linearRampToValueAtTime(0.90, now + 0.002); // Dentang palu logam instan
-    bellGain.gain.exponentialRampToValueAtTime(0.001, now + bellDuration);
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.setValueAtTime(0.45, now);
 
-    // Harmonik Inharmonis Lonceng Kuningan Asli:
-    // Pukulan Utama (880 Hz A5 & 1046.5 Hz C6) + Chime Gemerincing (1760 Hz & 2637 Hz) + Hum Bass (440 Hz)
+    const bellModGain = ctx.createGain();
+    bellModGain.gain.setValueAtTime(0.60, now);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(bellModGain.gain);
+
+    lfo.start(now);
+    lfo.stop(now + strikeEnd);
+    oscillatorsToClean.push(lfo);
+
+    // ==========================================
+    // 2. NADA HARMONIK KUBAH LONCENG ALARM (Brass Bell Dome Partials)
+    // ==========================================
     const bellPartials = [
-      { freq: 880.0, gain: 0.55, decay: 1.25 },  // Nada pokok dentang lonceng
-      { freq: 1046.5, gain: 0.40, decay: 1.05 }, // Tierce minor
-      { freq: 1318.5, gain: 0.35, decay: 0.95 }, // Kuinta E6
-      { freq: 1760.0, gain: 0.35, decay: 0.85 }, // Oktaf nominal lonceng
-      { freq: 2637.0, gain: 0.25, decay: 0.60 }, // Dentang logam tinggi
-      { freq: 440.0, gain: 0.40, decay: 1.35 },  // Dengung hum tembaga dalam
+      { freq: 880.0, gain: 0.40, type: 'sine' as OscillatorType },      // Nada pokok A5
+      { freq: 1175.0, gain: 0.45, type: 'triangle' as OscillatorType },  // Resonansi kubah D6
+      { freq: 1568.0, gain: 0.35, type: 'sine' as OscillatorType },      // Overtone terang G6
+      { freq: 2093.0, gain: 0.30, type: 'sine' as OscillatorType },      // Chime tajam C7
+      { freq: 2794.0, gain: 0.25, type: 'triangle' as OscillatorType },  // Shimmer logam F7
+      { freq: 440.0, gain: 0.35, type: 'sine' as OscillatorType },       // Hum bass kuningan A4
     ];
 
     bellPartials.forEach((partial) => {
-      const bOsc = ctx.createOscillator();
-      const bPartGain = ctx.createGain();
+      const osc = ctx.createOscillator();
+      const pGain = ctx.createGain();
 
-      bOsc.type = 'sine';
-      bOsc.frequency.setValueAtTime(partial.freq, now);
+      osc.type = partial.type;
+      osc.frequency.setValueAtTime(partial.freq, now);
 
-      bPartGain.gain.setValueAtTime(partial.gain, now);
-      bPartGain.gain.exponentialRampToValueAtTime(0.001, now + partial.decay);
+      pGain.gain.setValueAtTime(partial.gain, now);
 
-      bOsc.connect(bPartGain);
-      bPartGain.connect(bellGain);
+      osc.connect(pGain);
+      pGain.connect(bellModGain);
 
-      bOsc.start(now);
-      bOsc.stop(now + partial.decay);
+      osc.start(now);
+      osc.stop(now + totalDuration);
+      oscillatorsToClean.push(osc);
     });
 
-    bellGain.connect(compressor);
+    bellModGain.connect(compressor);
+
+    // ==========================================
+    // 3. DENTANG KLIK PALU LOGAM (Metallic Clapper Transient)
+    // Memberikan ketukan tajam ("CLANG-CLANG") di setiap pukulan palu lonceng
+    // ==========================================
+    const clickOsc = ctx.createOscillator();
+    clickOsc.type = 'square';
+    clickOsc.frequency.setValueAtTime(1760, now);
+
+    const clickFilter = ctx.createBiquadFilter();
+    clickFilter.type = 'highpass';
+    clickFilter.frequency.setValueAtTime(2200, now);
+
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.20, now);
+
+    clickOsc.connect(clickFilter);
+    clickFilter.connect(clickGain);
+    clickGain.connect(bellModGain);
+
+    clickOsc.start(now);
+    clickOsc.stop(now + strikeEnd);
+    oscillatorsToClean.push(clickOsc);
+
+    // ==========================================
+    // 4. KONTROLER INTERUPSI SEGERA (Bisa distop saat Juri Reset)
+    // ==========================================
+    activeBuzzerController = {
+      stop: () => {
+        try {
+          const stopTime = ctx.currentTime;
+          masterGain.gain.cancelScheduledValues(stopTime);
+          masterGain.gain.setValueAtTime(masterGain.gain.value, stopTime);
+          masterGain.gain.linearRampToValueAtTime(0.0001, stopTime + 0.04);
+          setTimeout(() => {
+            oscillatorsToClean.forEach((osc) => {
+              try {
+                osc.stop();
+                osc.disconnect();
+              } catch (_) {}
+            });
+            masterGain.disconnect();
+          }, 50);
+        } catch (_) {}
+      },
+    };
+
+    // Bersihkan referensi controller setelah 5 detik
+    setTimeout(() => {
+      activeBuzzerController = null;
+    }, totalDuration * 1000 + 100);
+
   } catch (e) {
     console.warn('Audio playback error:', e);
   }

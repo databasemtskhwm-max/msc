@@ -9,6 +9,7 @@ import type {
 } from '../types/scoreboard.ts';
 import {
   playBuzzerSound,
+  stopBuzzerSound,
   playCorrectSound,
   playWrongSound,
   playTimerTick,
@@ -131,6 +132,7 @@ export function useScoreboard() {
             if (event.data.extra) {
               setLastEvent(event.data.extra);
               if (event.data.extra.type === 'BUZZER_RING') playBuzzerSound();
+              else if (event.data.extra.type === 'BUZZER_RESET') stopBuzzerSound();
               else if (event.data.extra.type === 'SCORE_CHANGED') {
                 if (Number(event.data.extra.delta) >= 0) playCorrectSound();
                 else playWrongSound();
@@ -238,6 +240,7 @@ export function useScoreboard() {
       if (extra) {
         setLastEvent(extra);
         if (extra.type === 'BUZZER_RING') playBuzzerSound();
+        else if (extra.type === 'BUZZER_RESET') stopBuzzerSound();
         else if (extra.type === 'SCORE_CHANGED') {
           if (Number(extra.delta) >= 0) playCorrectSound();
           else playWrongSound();
@@ -295,6 +298,8 @@ export function useScoreboard() {
                 setLastEvent(data.extra);
                 if (data.extra.type === 'BUZZER_RING') {
                   playBuzzerSound();
+                } else if (data.extra.type === 'BUZZER_RESET') {
+                  stopBuzzerSound();
                 } else if (data.extra.type === 'SCORE_CHANGED') {
                   if (Number(data.extra.delta) >= 0) {
                     playCorrectSound();
@@ -706,6 +711,7 @@ export function useScoreboard() {
   };
 
   const resetBuzzer = async () => {
+    stopBuzzerSound();
     commitStateUpdate(
       (prev) => ({
         ...prev,
