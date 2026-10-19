@@ -33,8 +33,9 @@ import {
   ChevronDown,
   Volume2,
   Share2,
+  KeyRound,
 } from 'lucide-react';
-import { formatTimer } from '../utils/scoringLogic.ts';
+import { formatTimer, getTeamPin } from '../utils/scoringLogic.ts';
 import { MuhsinLogo } from './MuhsinLogo.tsx';
 import { SessionManagerView } from './SessionManagerView.tsx';
 
@@ -932,8 +933,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-800/80 font-mono">
-                  <span className="text-slate-500">Skor Sesi Ini:</span>
+                  <span className="text-slate-500">Skor:</span>
                   <span className="font-black text-amber-400">{team.score} Pts</span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-900 font-mono">
+                  <span className="text-slate-500 flex items-center gap-1">
+                    <KeyRound className="w-3 h-3 text-amber-400" />
+                    <span>PIN Tablet:</span>
+                  </span>
+                  <span className="font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                    {getTeamPin(team, state.teams.findIndex((t) => t.id === team.id))}
+                  </span>
                 </div>
               </div>
             ))}
@@ -1141,6 +1152,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 />
                 <span className="font-mono text-xs text-slate-300">{editingTeam.color}</span>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-xs text-slate-300 font-bold block mb-1">
+                PIN Kunci Bel Tablet (Default 4 digit)
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={editingTeam.pin || ''}
+                placeholder={getTeamPin(editingTeam, state.teams.findIndex((t) => t.id === editingTeam.id))}
+                onChange={(e) => setEditingTeam({ ...editingTeam, pin: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm font-mono tracking-widest placeholder:text-slate-600"
+              />
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                Contoh: 1111 untuk Regu A, 2222 untuk Regu B, dst.
+              </span>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">

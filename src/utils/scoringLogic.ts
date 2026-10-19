@@ -11,16 +11,34 @@ export const TEAM_PRESETS_8: Array<{
   name: string;
   color: string;
   accentColor: string;
+  pin: string;
 }> = [
-  { code: 'Regu A', name: 'SMA Al-Muhsin Putra', color: '#f59e0b', accentColor: '#fbbf24' },
-  { code: 'Regu B', name: 'SMA Al-Muhsin Putri', color: '#06b6d4', accentColor: '#22d3ee' },
-  { code: 'Regu C', name: 'MAN 1 Unggulan', color: '#10b981', accentColor: '#34d399' },
-  { code: 'Regu D', name: 'SMA IT Cendekia', color: '#ec4899', accentColor: '#f472b6' },
-  { code: 'Regu E', name: 'MTs KH. A. Wahab Muhsin', color: '#8b5cf6', accentColor: '#a78bfa' },
-  { code: 'Regu F', name: 'Ponpes Sukahideng Putra', color: '#f97316', accentColor: '#fb923c' },
-  { code: 'Regu G', name: 'Ponpes Sukahideng Putri', color: '#84cc16', accentColor: '#a3e635' },
-  { code: 'Regu H', name: 'MA Al-Falah Tasikmalaya', color: '#6366f1', accentColor: '#818cf8' },
+  { code: 'Regu A', name: 'SMA Al-Muhsin Putra', color: '#f59e0b', accentColor: '#fbbf24', pin: '1111' },
+  { code: 'Regu B', name: 'SMA Al-Muhsin Putri', color: '#06b6d4', accentColor: '#22d3ee', pin: '2222' },
+  { code: 'Regu C', name: 'MAN 1 Unggulan', color: '#10b981', accentColor: '#34d399', pin: '3333' },
+  { code: 'Regu D', name: 'SMA IT Cendekia', color: '#ec4899', accentColor: '#f472b6', pin: '4444' },
+  { code: 'Regu E', name: 'MTs KH. A. Wahab Muhsin', color: '#8b5cf6', accentColor: '#a78bfa', pin: '5555' },
+  { code: 'Regu F', name: 'Ponpes Sukahideng Putra', color: '#f97316', accentColor: '#fb923c', pin: '6666' },
+  { code: 'Regu G', name: 'Ponpes Sukahideng Putri', color: '#84cc16', accentColor: '#a3e635', pin: '7777' },
+  { code: 'Regu H', name: 'MA Al-Falah Tasikmalaya', color: '#6366f1', accentColor: '#818cf8', pin: '8888' },
 ];
+
+export const MASTER_ADMIN_PIN = '9999';
+
+export function getTeamPin(team: Team, index?: number): string {
+  if (team.pin && team.pin.trim()) return team.pin.trim();
+  let idx = index;
+  if (idx === undefined) {
+    const match = team.code.match(/[A-H]/i);
+    if (match) {
+      idx = match[0].toUpperCase().charCodeAt(0) - 65;
+    } else {
+      idx = 0;
+    }
+  }
+  const digit = ((idx % 8) + 1).toString();
+  return digit.repeat(4);
+}
 
 export function createInitialTeams(): Team[] {
   return TEAM_PRESETS_8.slice(0, 4).map((preset, index) => ({
@@ -32,6 +50,7 @@ export function createInitialTeams(): Team[] {
     color: preset.color,
     accentColor: preset.accentColor,
     active: true,
+    pin: preset.pin,
   }));
 }
 
@@ -45,6 +64,7 @@ export function createAll8Teams(): Team[] {
     color: preset.color,
     accentColor: preset.accentColor,
     active: true,
+    pin: preset.pin,
   }));
 }
 

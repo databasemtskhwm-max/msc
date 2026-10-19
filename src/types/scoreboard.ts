@@ -9,6 +9,7 @@ export interface Team {
   active: boolean;
   buzzerRank?: number;
   buzzerTime?: number;
+  pin?: string;
 }
 
 export interface Round {
