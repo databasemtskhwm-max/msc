@@ -67,7 +67,7 @@ export function stopBuzzerSound() {
 /**
  * Authentic Indonesian Lonceng Alarm Cerdas Cermat (Electric School/Fire Alarm Bell)
  * Menghasilkan bunyi lonceng alarm listrik mekanis ("KRIIIIINNNNNGGGGGG") yang sangat keras,
- * bergetar cepat (~20 Hz pukulan palu pada kubah lonceng kuningan), berbunyi selama 5 detik penuh,
+ * bergetar cepat (~20 Hz pukulan palu pada kubah lonceng kuningan), berbunyi selama 3 detik penuh,
  * dan dapat dihentikan seketika jika Juri melakukan Reset Bel.
  */
 export function playBuzzerSound() {
@@ -84,8 +84,8 @@ export function playBuzzerSound() {
     stopBuzzerSound();
 
     const now = ctx.currentTime;
-    const totalDuration = 5.0; // Durasi bunyi tepat 5 detik sesuai permintaan!
-    const strikeEnd = 4.75;    // Palu alarm berhenti di 4.75s, gema lonceng meluruh halus sampai 5.0s
+    const totalDuration = 3.0; // Durasi bunyi tepat 3 detik sesuai permintaan!
+    const strikeEnd = 2.75;    // Palu alarm berhenti di 2.75s, gema lonceng meluruh halus sampai 3.0s
 
     // Master Dynamics Compressor: Memaksimalkan volume alarm agar sangat keras dan tembus
     // di speaker aula/panggung tanpa distorsi digital clipping (0 dBFS ceiling)
