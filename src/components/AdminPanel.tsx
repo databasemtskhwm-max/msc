@@ -268,7 +268,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               <div>
                 <div className="text-xs font-extrabold uppercase tracking-wide text-amber-300">
-                  BEL DITEKAN TERCEPAT (+{firstBuzzer.relativeMs}ms)
+                  🏆 REGU BERHAK MENJAWAB (BEL TERCEPAT)
                 </div>
                 <div className="text-base font-black text-white">
                   {firstBuzzer.teamCode} — {firstBuzzer.teamName}

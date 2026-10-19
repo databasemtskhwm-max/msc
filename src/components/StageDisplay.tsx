@@ -239,29 +239,16 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="bg-amber-400 text-slate-950 font-black text-xs uppercase px-3 py-0.5 rounded-full shadow-xs">
-                  🏆 BEL TERCEPAT
+                  🏆 BERHAK MENJAWAB (BEL TERCEPAT)
                 </span>
                 <span className="text-amber-200 text-xs font-mono font-bold">+0.00 detik</span>
               </div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1 tracking-tight text-white drop-shadow-md">
                 {firstBuzzer.teamCode} — <span className="text-amber-300">{firstBuzzer.teamName}</span>
               </h2>
-
-              {/* Subsequent buzzer queue chips */}
-              {state.buzzerQueue.length > 1 && (
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <span className="text-xs text-rose-100 font-semibold">Antrean Bel:</span>
-                  {state.buzzerQueue.slice(1).map((item, qIdx) => (
-                    <span
-                      key={item.teamId}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-black/30 border border-white/20 text-xs text-white font-mono"
-                    >
-                      <span className="font-bold text-amber-300">#{qIdx + 2} {item.teamCode}</span>
-                      <span className="text-slate-200 text-[11px]">(+{(item.relativeMs / 1000).toFixed(2)}s)</span>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <p className="text-xs text-rose-100 font-semibold mt-1">
+                🔒 Sistem mengunci regu ini secara eksklusif. Bel tertutup untuk regu lain sampai di-reset oleh Juri.
+              </p>
             </div>
           </div>
 
@@ -349,7 +336,7 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   {isBuzzerFirst && (
                     <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[11px] shadow-sm animate-bounce flex items-center gap-1">
                       <BellRing className="w-3 h-3" />
-                      <span>BEL #1</span>
+                      <span>BERHAK MENJAWAB</span>
                     </span>
                   )}
 

@@ -5,6 +5,7 @@ import type {
   Round,
   ScoreHistoryEntry,
   CompetitionSession,
+  BuzzerEntry,
 } from '../types/scoreboard.ts';
 import {
   playBuzzerSound,
@@ -113,7 +114,19 @@ export function useScoreboard() {
               lastTickTimeRef.current = Date.now();
               setState((prev) => (prev ? { ...prev, timer: event.data.payload.timer } : event.data.payload));
             } else {
-              setState(event.data.payload);
+              setState((prev) => {
+                if (
+                  event.data.extra?.type === 'BUZZER_RING' &&
+                  prev &&
+                  (prev.isBuzzerLocked || prev.buzzerQueue.length > 0) &&
+                  prev.buzzerQueue[0]?.teamId &&
+                  event.data.payload?.buzzerQueue?.[0]?.teamId &&
+                  prev.buzzerQueue[0].teamId !== event.data.payload.buzzerQueue[0].teamId
+                ) {
+                  return prev;
+                }
+                return event.data.payload;
+              });
             }
             if (event.data.extra) {
               setLastEvent(event.data.extra);
@@ -204,7 +217,19 @@ export function useScoreboard() {
         lastTickTimeRef.current = Date.now();
         setState((prev) => (prev ? { ...prev, timer: remoteState.timer } : remoteState));
       } else {
-        setState(remoteState);
+        setState((prev) => {
+          if (
+            extra?.type === 'BUZZER_RING' &&
+            prev &&
+            (prev.isBuzzerLocked || prev.buzzerQueue.length > 0) &&
+            prev.buzzerQueue[0]?.teamId &&
+            remoteState.buzzerQueue?.[0]?.teamId &&
+            prev.buzzerQueue[0].teamId !== remoteState.buzzerQueue[0].teamId
+          ) {
+            return prev;
+          }
+          return remoteState;
+        });
       }
       notifyLocalTabs(remoteState, extra);
       setIsConnected(true);
@@ -397,6 +422,15 @@ export function useScoreboard() {
     ) => {
       setState((prev) => {
         if (!prev) return prev;
+
+        // Protection: If incoming event is a BUZZER_RING, but someone already buzzed in prev,
+        // do not let another team hijack or overwrite the first team!
+        if (extraEvent?.type === 'BUZZER_RING' && (prev.isBuzzerLocked || prev.buzzerQueue.length > 0)) {
+          if (prev.buzzerQueue[0]?.teamId && prev.buzzerQueue[0].teamId !== extraEvent.teamId) {
+            return prev;
+          }
+        }
+
         const updated = updater(prev);
         const withCommittedSession = syncTopLevelToActiveSession({
           ...updated,
@@ -585,8 +619,14 @@ export function useScoreboard() {
       return { success: false, message: 'Status papan skor belum termuat' };
     }
 
-    if (currentState.isBuzzerLocked) {
-      return { success: false, message: 'Bel saat ini terkunci' };
+    // STRICT CHECK: IF ALREADY LOCKED OR ALREADY BUZZED BY ANY TEAM, IMMEDIATELY BLOCK
+    if (currentState.isBuzzerLocked || currentState.buzzerQueue.length > 0) {
+      const winner = currentState.buzzerQueue[0];
+      return {
+        success: false,
+        isFirst: false,
+        message: winner ? `Bel sudah dikunci oleh ${winner.teamCode}!` : 'Bel saat ini terkunci',
+      };
     }
 
     const team = currentState.teams.find((t) => t.id === teamId);
@@ -594,17 +634,15 @@ export function useScoreboard() {
       return { success: false, message: 'Regu tidak ditemukan' };
     }
 
-    if (currentState.buzzerQueue.some((b) => b.teamId === teamId)) {
-      return { success: false, message: 'Sudah tercatat dalam antrean bel' };
-    }
-
     const now = Date.now();
-    const { updatedQueue, isFirst } = registerBuzzerPress(
-      currentState.buzzerQueue,
-      team,
-      currentState.isBuzzerLocked,
-      now
-    );
+    const winningEntry: BuzzerEntry = {
+      teamId: team.id,
+      teamCode: team.code,
+      teamName: team.name,
+      color: team.color,
+      timestamp: now,
+      relativeMs: 0,
+    };
 
     // 1. Play authentic cerdas cermat buzzer sound immediately
     playBuzzerSound();
@@ -612,28 +650,28 @@ export function useScoreboard() {
     // 2. Commit optimistic update to state, BroadcastChannel, and Supabase Realtime
     commitStateUpdate(
       (prev) => {
-        if (prev.isBuzzerLocked || prev.buzzerQueue.some((b) => b.teamId === teamId)) {
+        // Double check: if already locked or another team already pressed, DO NOT OVERWRITE!
+        if (prev.isBuzzerLocked || prev.buzzerQueue.length > 0) {
           return prev;
         }
 
-        const activeAnnouncement = isFirst
-          ? {
-              id: 'buzz-' + now,
-              type: 'buzzer' as const,
-              teamId: team.id,
-              teamName: team.name,
-              message: `${team.code} (${team.name}) menekan bel tercepat!`,
-              timestamp: now,
-            }
-          : prev.activeAnnouncement;
+        const activeAnnouncement = {
+          id: 'buzz-' + now,
+          type: 'buzzer' as const,
+          teamId: team.id,
+          teamName: team.name,
+          message: `${team.code} (${team.name}) menekan bel tercepat! Berhak menjawab.`,
+          timestamp: now,
+        };
 
         return {
           ...prev,
-          buzzerQueue: updatedQueue,
+          isBuzzerLocked: true, // EXCLUSIVE LOCK!
+          buzzerQueue: [winningEntry],
           activeAnnouncement,
         };
       },
-      { type: 'BUZZER_RING', teamId, isFirst },
+      { type: 'BUZZER_RING', teamId, isFirst: true },
       false
     );
 
@@ -654,8 +692,8 @@ export function useScoreboard() {
 
     return {
       success: true,
-      isFirst,
-      message: isFirst ? '🏆 ANDA BEL TERCEPAT!' : 'Tercatat dalam antrean bel',
+      isFirst: true,
+      message: '🏆 REGU ANDA BERHAK MENJAWAB! (BEL TERCEPAT)',
     };
   };
 
@@ -663,6 +701,7 @@ export function useScoreboard() {
     commitStateUpdate(
       (prev) => ({
         ...prev,
+        isBuzzerLocked: false, // UNLOCK so next question can be buzzed!
         buzzerQueue: [],
         activeAnnouncement: prev.activeAnnouncement?.type === 'buzzer' ? null : prev.activeAnnouncement,
       }),

@@ -210,7 +210,8 @@ export const BuzzerView: React.FC<BuzzerViewProps> = ({ state, onBuzzIn }) => {
   }, [showUnlockModal, isTabletLocked, inputPin, unlockPin]);
 
   const handlePress = async () => {
-    if (state.isBuzzerLocked || isQueued) return;
+    // STRICT: If buzzer is locked or already pressed by ANY team, block immediately
+    if (state.isBuzzerLocked || state.buzzerQueue.length > 0) return;
 
     // Unlock browser audio context on user gesture
     unlockAudio();
@@ -227,9 +228,9 @@ export const BuzzerView: React.FC<BuzzerViewProps> = ({ state, onBuzzIn }) => {
     try {
       const result = await onBuzzIn(selectedTeamId);
       if (result && result.success) {
-        setFeedback(result.isFirst ? '🏆 REGU ANDA BEL TERCEPAT!' : 'Tercatat dalam antrean bel');
+        setFeedback('🏆 REGU ANDA BERHAK MENJAWAB! (BEL TERCEPAT)');
       } else {
-        setFeedback(result?.message || 'Gagal menekan bel');
+        setFeedback(result?.message || 'Bel sudah terkunci');
       }
     } catch {
       setFeedback('Terjadi kendala koneksi bel');
@@ -418,23 +419,20 @@ export const BuzzerView: React.FC<BuzzerViewProps> = ({ state, onBuzzIn }) => {
 
             {/* Real-time Status Banner */}
             <div className="mb-6 z-10 w-full flex justify-center">
-              {state.isBuzzerLocked ? (
+              {isFirst ? (
+                <div className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-500 text-slate-950 text-base font-black shadow-xl shadow-emerald-500/40 ring-4 ring-emerald-300 animate-bounce">
+                  <CheckCircle2 className="w-6 h-6 stroke-[3]" />
+                  <span>🏆 REGU ANDA BERHAK MENJAWAB! (BEL TERCEPAT)</span>
+                </div>
+              ) : firstInQueue ? (
+                <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-rose-950/95 border-2 border-rose-600 text-rose-200 text-sm font-black shadow-lg">
+                  <Lock className="w-4 h-4 text-rose-400" />
+                  <span>🔒 {firstInQueue.teamCode} ({firstInQueue.teamName}) MENANGKAN BEL & BERHAK MENJAWAB</span>
+                </div>
+              ) : state.isBuzzerLocked ? (
                 <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-rose-950/90 border-2 border-rose-600 text-rose-300 text-sm font-black shadow-lg animate-pulse">
                   <Lock className="w-5 h-5 text-rose-400" />
                   <span>BEL TERKUNCI OLEH JURI / SERVER</span>
-                </div>
-              ) : isFirst ? (
-                <div className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-500 text-slate-950 text-base font-black shadow-xl shadow-emerald-500/40 ring-4 ring-emerald-300 animate-bounce">
-                  <CheckCircle2 className="w-6 h-6 stroke-[3]" />
-                  <span>🏆 REGU ANDA BEL TERCEPAT! (+0.00s)</span>
-                </div>
-              ) : isQueued ? (
-                <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500/25 border-2 border-amber-400 text-amber-200 text-sm font-extrabold shadow-lg">
-                  <span>Antrean #{inQueueIndex + 1} (+{((relativeMs || 0) / 1000).toFixed(2)} detik)</span>
-                </div>
-              ) : firstInQueue ? (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/90 border border-amber-500/50 text-amber-300 text-xs font-bold">
-                  <span>{firstInQueue.teamCode} menekan bel lebih dahulu</span>
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-slate-950/90 border border-slate-700 text-emerald-400 text-xs font-black uppercase tracking-wider">
@@ -447,15 +445,13 @@ export const BuzzerView: React.FC<BuzzerViewProps> = ({ state, onBuzzIn }) => {
             {/* The Giant Responsive Buzzer Button */}
             <button
               onClick={handlePress}
-              disabled={state.isBuzzerLocked || isQueued}
+              disabled={state.isBuzzerLocked || Boolean(firstInQueue)}
               aria-label={`Bel ${selectedTeam?.name}`}
               className={`relative z-10 w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-full border-8 sm:border-[12px] transition-all duration-100 flex flex-col items-center justify-center shadow-2xl select-none cursor-pointer active:scale-95 ${
-                state.isBuzzerLocked
-                  ? 'bg-slate-800 border-slate-700 opacity-60 cursor-not-allowed shadow-none'
-                  : isFirst
+                isFirst
                   ? 'bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 border-emerald-200 shadow-emerald-500/80 ring-8 ring-emerald-400/40 animate-pulse'
-                  : isQueued
-                  ? 'bg-gradient-to-tr from-amber-700 to-amber-500 border-amber-300 ring-4 ring-amber-500/30'
+                  : state.isBuzzerLocked || Boolean(firstInQueue)
+                  ? 'bg-slate-800 border-slate-700 opacity-60 cursor-not-allowed shadow-none'
                   : 'bg-gradient-to-tr from-rose-700 via-rose-600 to-red-500 border-rose-300 hover:brightness-110 shadow-[0_0_50px_rgba(225,29,72,0.6)] ring-8 sm:ring-[14px] ring-rose-500/30'
               }`}
               style={{
@@ -472,7 +468,7 @@ export const BuzzerView: React.FC<BuzzerViewProps> = ({ state, onBuzzIn }) => {
               />
 
               <span className="text-2xl sm:text-4xl md:text-5xl font-black text-white tracking-widest uppercase font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                {state.isBuzzerLocked ? 'TERKUNCI' : isQueued ? 'TERCATAT' : 'TEKAN BEL!'}
+                {isFirst ? 'BERHAK MENJAWAB' : state.isBuzzerLocked || Boolean(firstInQueue) ? 'TERKUNCI' : 'TEKAN BEL!'}
               </span>
 
               <span className="text-xs sm:text-base font-black text-white/95 uppercase tracking-widest mt-1 sm:mt-2 px-3.5 py-0.5 rounded-full bg-black/35 backdrop-blur-xs">

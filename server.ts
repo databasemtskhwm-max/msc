@@ -279,31 +279,31 @@ async function startServer() {
   function handleBuzzerPress(teamId: string) {
     const team = state.teams.find((t) => t.id === teamId);
     if (!team) return { success: false, message: 'Regu tidak ditemukan' };
-    if (state.isBuzzerLocked) return { success: false, message: 'Bel saat ini terkunci' };
-
-    const { updatedQueue, isFirst } = registerBuzzerPress(
-      state.buzzerQueue,
-      team,
-      state.isBuzzerLocked,
-      Date.now()
-    );
-
-    if (updatedQueue.length !== state.buzzerQueue.length) {
-      state.buzzerQueue = updatedQueue;
-      if (isFirst) {
-        state.activeAnnouncement = {
-          id: 'buzz-' + Date.now(),
-          type: 'buzzer',
-          teamId: team.id,
-          teamName: team.name,
-          message: `${team.code} (${team.name}) menekan bel tercepat!`,
-          timestamp: Date.now(),
-        };
-      }
-      broadcastState({ type: 'BUZZER_RING', teamId: team.id, isFirst });
-      return { success: true, isFirst };
+    if (state.isBuzzerLocked || state.buzzerQueue.length > 0) {
+      return { success: false, message: 'Bel sudah dikunci oleh regu lain dan tertutup' };
     }
-    return { success: false, message: 'Sudah tercatat dalam antrean bel' };
+
+    state.isBuzzerLocked = true; // Auto-lock exclusively to this team
+    state.buzzerQueue = [
+      {
+        teamId: team.id,
+        teamCode: team.code,
+        teamName: team.name,
+        color: team.color,
+        timestamp: Date.now(),
+        relativeMs: 0,
+      },
+    ];
+    state.activeAnnouncement = {
+      id: 'buzz-' + Date.now(),
+      type: 'buzzer',
+      teamId: team.id,
+      teamName: team.name,
+      message: `${team.code} (${team.name}) menekan bel tercepat! Berhak menjawab.`,
+      timestamp: Date.now(),
+    };
+    broadcastState({ type: 'BUZZER_RING', teamId: team.id, isFirst: true });
+    return { success: true, isFirst: true };
   }
 
   // Timer interval on the server so timer is authoritative across all screens
@@ -496,6 +496,7 @@ async function startServer() {
   // 9. Buzzer Reset / Lock
   app.post('/api/buzzer/reset', (req, res) => {
     state.buzzerQueue = [];
+    state.isBuzzerLocked = false;
     state.activeAnnouncement = null;
     broadcastState({ type: 'BUZZER_RESET' });
     res.json({ success: true });
@@ -518,6 +519,7 @@ async function startServer() {
     state.currentRoundId = roundId;
     resetTimer(selectedRound.defaultTimerSeconds);
     state.buzzerQueue = [];
+    state.isBuzzerLocked = false;
     state.activeAnnouncement = {
       id: 'round-' + Date.now(),
       type: 'round_change',
