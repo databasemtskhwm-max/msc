@@ -34,6 +34,7 @@ import {
   Volume2,
   Share2,
   KeyRound,
+  Calculator,
 } from 'lucide-react';
 import { formatTimer, getTeamPin } from '../utils/scoringLogic.ts';
 import { MuhsinLogo } from './MuhsinLogo.tsx';
@@ -96,9 +97,59 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [manualScoreValue, setManualScoreValue] = useState('');
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
+  // Input Poin Manual Bebas (di luar template)
+  const [customPoints, setCustomPoints] = useState<Record<string, string>>({});
+  const [buzzerCustomPoint, setBuzzerCustomPoint] = useState<string>('');
+  const [isCustomScoreModalOpen, setIsCustomScoreModalOpen] = useState(false);
+  const [modalCustomTeamId, setModalCustomTeamId] = useState<string>('');
+  const [modalCustomPoints, setModalCustomPoints] = useState<string>('');
+  const [modalCustomRoundId, setModalCustomRoundId] = useState<string>('');
+  const [modalCustomNote, setModalCustomNote] = useState<string>('');
+
+  // Edit Template Poin & Waktu Babak
+  const [roundEditModal, setRoundEditModal] = useState<Round | null>(null);
+  const [editCorrectPoints, setEditCorrectPoints] = useState<string>('100');
+  const [editWrongPoints, setEditWrongPoints] = useState<string>('-100');
+  const [editTimerSeconds, setEditTimerSeconds] = useState<string>('15');
+
   const showNotification = (msg: string) => {
     setActionSuccessMsg(msg);
     setTimeout(() => setActionSuccessMsg(''), 2500);
+  };
+
+  const handleApplyCustomScore = async (team: Team, sign: 1 | -1) => {
+    const rawVal = customPoints[team.id];
+    const val = Math.abs(parseInt(rawVal, 10));
+    if (isNaN(val) || val <= 0) return;
+
+    const delta = sign * val;
+    const note = delta > 0 ? `Nilai Manual (+${val})` : `Nilai Manual (-${val})`;
+    await onAddScore(team.id, delta, note, state.currentRoundId);
+    setCustomPoints((prev) => ({ ...prev, [team.id]: '' }));
+    showNotification(`${delta > 0 ? '+' : ''}${delta} poin untuk ${team.code}`);
+  };
+
+  const handleApplyModalCustomScore = async (sign: 1 | -1) => {
+    const targetTeamId = modalCustomTeamId || state.teams[0]?.id;
+    const team = state.teams.find((t) => t.id === targetTeamId);
+    if (!team) return;
+
+    const val = Math.abs(parseInt(modalCustomPoints, 10));
+    if (isNaN(val) || val <= 0) {
+      alert('Masukkan besaran nilai yang valid (angka lebih dari 0)');
+      return;
+    }
+
+    const delta = sign * val;
+    const targetRound = modalCustomRoundId || state.currentRoundId;
+    const roundName = state.rounds.find((r) => r.id === targetRound)?.name || 'Babak Aktif';
+    const note = modalCustomNote.trim() || `Nilai Manual ${roundName} (${delta > 0 ? '+' : ''}${delta})`;
+
+    await onAddScore(team.id, delta, note, targetRound);
+    showNotification(`${delta > 0 ? '+' : ''}${delta} poin manual berhasil diberikan ke ${team.code}`);
+    setIsCustomScoreModalOpen(false);
+    setModalCustomPoints('');
+    setModalCustomNote('');
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -276,7 +327,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={async () => {
                   const pts = currentRound.correctPoints ?? 100;
@@ -284,7 +335,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   await onResetBuzzer();
                   showNotification(`+${pts} untuk ${firstBuzzer.teamCode}`);
                 }}
-                className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition flex items-center justify-center gap-1 shadow-md cursor-pointer"
+                className="flex-1 sm:flex-none px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition flex items-center justify-center gap-1 shadow-md cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Benar (+{currentRound.correctPoints ?? 100})</span>
@@ -299,15 +350,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   await onResetBuzzer();
                   showNotification(`Salah (${pts}) untuk ${firstBuzzer.teamCode}`);
                 }}
-                className="flex-1 sm:flex-none px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black rounded-xl transition flex items-center justify-center gap-1 shadow-md cursor-pointer"
+                className="flex-1 sm:flex-none px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black rounded-xl transition flex items-center justify-center gap-1 shadow-md cursor-pointer"
               >
                 <XCircle className="w-4 h-4" />
                 <span>Salah ({currentRound.wrongPoints ?? (isBabakWajib ? 0 : -100)})</span>
               </button>
 
+              {/* Input Nilai Custom untuk Pemenang Bel */}
+              <div className="flex items-center gap-1 bg-slate-950/90 p-1 rounded-xl border border-amber-400/40">
+                <input
+                  type="number"
+                  placeholder="Poin bebas..."
+                  value={buzzerCustomPoint}
+                  onChange={(e) => setBuzzerCustomPoint(e.target.value)}
+                  className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono text-xs font-bold placeholder:text-slate-500 focus:outline-hidden"
+                />
+                <button
+                  onClick={async () => {
+                    const val = Math.abs(parseInt(buzzerCustomPoint, 10));
+                    if (!isNaN(val) && val > 0) {
+                      await onAddScore(firstBuzzer.teamId, val, `Rebutan Benar (+${val})`);
+                      await onResetBuzzer();
+                      setBuzzerCustomPoint('');
+                      showNotification(`+${val} untuk ${firstBuzzer.teamCode}`);
+                    }
+                  }}
+                  disabled={!buzzerCustomPoint || isNaN(Number(buzzerCustomPoint)) || Number(buzzerCustomPoint) <= 0}
+                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 text-white text-xs font-black rounded-lg cursor-pointer transition shadow-xs"
+                  title="Tambah Poin Custom"
+                >
+                  +
+                </button>
+                <button
+                  onClick={async () => {
+                    const val = Math.abs(parseInt(buzzerCustomPoint, 10));
+                    if (!isNaN(val) && val > 0) {
+                      await onAddScore(firstBuzzer.teamId, -val, `Rebutan Salah (-${val})`);
+                      await onResetBuzzer();
+                      setBuzzerCustomPoint('');
+                      showNotification(`-${val} untuk ${firstBuzzer.teamCode}`);
+                    }
+                  }}
+                  disabled={!buzzerCustomPoint || isNaN(Number(buzzerCustomPoint)) || Number(buzzerCustomPoint) <= 0}
+                  className="px-2 py-1 bg-rose-700 hover:bg-rose-600 disabled:opacity-30 text-white text-xs font-black rounded-lg cursor-pointer transition shadow-xs"
+                  title="Kurang Poin Custom"
+                >
+                  -
+                </button>
+              </div>
+
               <button
                 onClick={onResetBuzzer}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
                 title="Reset Antrean Bel"
               >
                 Reset
@@ -430,20 +524,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* Quick Round Instruction Header */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 text-amber-400 shrink-0" />
               <span className="text-white font-bold">
                 Babak Aktif: <strong className="text-amber-400">{currentRound.name}</strong>
               </span>
             </div>
-            <span className="text-[11px] text-slate-400 hidden sm:inline">
-              {isBabakPenawaran
-                ? 'Babak Penawaran: Input taruhan skor (+ / -)'
-                : isBabakWajib
-                ? 'Babak Wajib: Benar +100 poin, salah 0 poin'
-                : 'Babak Rebutan: Benar +100 poin, salah -100 poin'}
-            </span>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+              <span className="text-[11px] text-slate-400 hidden lg:inline">
+                {isBabakPenawaran
+                  ? 'Babak Penawaran: Input taruhan skor (+ / -)'
+                  : isBabakWajib
+                  ? 'Babak Wajib: Benar +100 poin, salah 0 poin'
+                  : 'Babak Rebutan: Benar +100 poin, salah -100 poin'}
+              </span>
+
+              <button
+                onClick={() => {
+                  setModalCustomTeamId(state.teams[0]?.id || '');
+                  setModalCustomPoints('');
+                  setModalCustomNote('');
+                  setModalCustomRoundId(state.currentRoundId);
+                  setIsCustomScoreModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer active:scale-95 shrink-0"
+              >
+                <Calculator className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>+ Input Poin Manual Bebas</span>
+              </button>
+            </div>
           </div>
 
           {/* Team Cards Grid (Touch Friendly) */}
@@ -676,8 +787,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     className="px-2.5 py-1 text-slate-400 hover:text-amber-400 hover:bg-slate-900 rounded-lg transition flex items-center gap-1 text-[11px] font-bold cursor-pointer"
                   >
                     <Edit2 className="w-3 h-3" />
-                    <span>Koreksi</span>
+                    <span>Koreksi Total</span>
                   </button>
+                </div>
+
+                {/* Input Nilai Manual Bebas (Angka di luar template) */}
+                <div className="mt-2.5 pt-2 border-t border-slate-800/70 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">
+                    <span className="flex items-center gap-1.5 text-amber-300 font-extrabold">
+                      <Calculator className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Input Nilai Manual Bebas:</span>
+                    </span>
+                    <span className="text-[9px] text-slate-500 lowercase">(angka bebas di luar template)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      placeholder="Ketik angka, misal: 15, 35, 75..."
+                      value={customPoints[team.id] ?? ''}
+                      onChange={(e) => setCustomPoints({ ...customPoints, [team.id]: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleApplyCustomScore(team, 1);
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-lg text-white font-mono text-xs font-bold placeholder:text-slate-600 focus:outline-hidden"
+                    />
+                    <button
+                      onClick={() => handleApplyCustomScore(team, 1)}
+                      disabled={!customPoints[team.id] || isNaN(Number(customPoints[team.id])) || Number(customPoints[team.id]) === 0}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black text-xs rounded-lg transition active:scale-95 cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
+                      title="Tambah Nilai Manual"
+                    >
+                      <Plus className="w-3 h-3 stroke-[3]" />
+                      <span>Tambah</span>
+                    </button>
+                    <button
+                      onClick={() => handleApplyCustomScore(team, -1)}
+                      disabled={!customPoints[team.id] || isNaN(Number(customPoints[team.id])) || Number(customPoints[team.id]) === 0}
+                      className="px-2.5 py-1.5 bg-rose-700 hover:bg-rose-600 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black text-xs rounded-lg transition active:scale-95 cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
+                      title="Kurang Nilai Manual"
+                    >
+                      <Minus className="w-3 h-3 stroke-[3]" />
+                      <span>Kurang</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -996,9 +1148,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800/80 gap-1 flex-wrap">
                     <span>Timer: <strong className="text-amber-400">{round.defaultTimerSeconds}s</strong></span>
                     <span>Poin: <strong className="text-emerald-400">+{round.correctPoints}</strong> / <strong className="text-rose-400">{round.wrongPoints}</strong></span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRoundEditModal({ ...round });
+                        setEditCorrectPoints(String(round.correctPoints ?? 100));
+                        setEditWrongPoints(String(round.wrongPoints ?? (round.id === 'round-wajib' ? 0 : -100)));
+                        setEditTimerSeconds(String(round.defaultTimerSeconds ?? 15));
+                      }}
+                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-white rounded border border-slate-700 transition text-[10px] font-bold cursor-pointer"
+                    >
+                      Edit Template
+                    </button>
                   </div>
                 </div>
               );
@@ -1236,6 +1400,187 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
               <button
                 onClick={() => setManualScoreModal(null)}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GLOBAL CUSTOM SCORE INPUT MODAL */}
+      {isCustomScoreModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-amber-400" />
+                <span>Input Nilai Manual Bebas</span>
+              </h3>
+              <button
+                onClick={() => setIsCustomScoreModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 mb-4">
+              Masukkan besaran nilai custom yang tidak ada pada template tombol untuk regu yang dipilih.
+            </p>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Pilih Regu
+                </label>
+                <select
+                  value={modalCustomTeamId || state.teams[0]?.id}
+                  onChange={(e) => setModalCustomTeamId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold text-xs"
+                >
+                  {state.teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.code} — {t.name} (Skor saat ini: {t.score})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Alokasi Babak
+                </label>
+                <select
+                  value={modalCustomRoundId || state.currentRoundId}
+                  onChange={(e) => setModalCustomRoundId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold text-xs"
+                >
+                  {state.rounds.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} {r.id === state.currentRoundId ? '(Babak Aktif)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Besaran Nilai Bebas (Angka Positif)
+                </label>
+                <input
+                  type="number"
+                  placeholder="Misal: 15, 30, 45, 75, 120, 250..."
+                  value={modalCustomPoints}
+                  onChange={(e) => setModalCustomPoints(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-base font-bold placeholder:text-slate-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Catatan / Keterangan (Opsional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Misal: Jawaban kurang sempurna, Bonus juri, Penalti..."
+                  value={modalCustomNote}
+                  onChange={(e) => setModalCustomNote(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleApplyModalCustomScore(1)}
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer active:scale-95"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>+ Tambah Nilai</span>
+              </button>
+              <button
+                onClick={() => handleApplyModalCustomScore(-1)}
+                className="flex-1 py-3 bg-rose-700 hover:bg-rose-600 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-rose-700/30 cursor-pointer active:scale-95"
+              >
+                <Minus className="w-4 h-4 stroke-[3]" />
+                <span>- Kurang Nilai</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ROUND TEMPLATE EDIT MODAL */}
+      {roundEditModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-base font-black text-white mb-1">
+              Edit Template Nilai & Waktu
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Babak: <strong className="text-amber-400">{roundEditModal.name}</strong>
+            </p>
+
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Poin Benar (+ Nilai Default Template)
+                </label>
+                <input
+                  type="number"
+                  value={editCorrectPoints}
+                  onChange={(e) => setEditCorrectPoints(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-emerald-400 font-mono text-base font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Poin Salah (- Nilai Default Template)
+                </label>
+                <input
+                  type="number"
+                  value={editWrongPoints}
+                  onChange={(e) => setEditWrongPoints(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-rose-400 font-mono text-base font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Alokasi Waktu Default (Detik)
+                </label>
+                <input
+                  type="number"
+                  value={editTimerSeconds}
+                  onChange={(e) => setEditTimerSeconds(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-amber-400 font-mono text-base font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  if (onManageRound) {
+                    await onManageRound('update', {
+                      ...roundEditModal,
+                      correctPoints: parseInt(editCorrectPoints, 10) || 100,
+                      wrongPoints: parseInt(editWrongPoints, 10) || 0,
+                      defaultTimerSeconds: parseInt(editTimerSeconds, 10) || 15,
+                    }, roundEditModal.id);
+                    showNotification(`Template ${roundEditModal.name} berhasil diperbarui!`);
+                    setRoundEditModal(null);
+                  }
+                }}
+                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer"
+              >
+                Simpan Perubahan
+              </button>
+              <button
+                onClick={() => setRoundEditModal(null)}
                 className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
               >
                 Batal
