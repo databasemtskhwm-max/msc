@@ -22,7 +22,7 @@ import {
   duplicateSession,
   deleteSession,
 } from '../utils/sessionLogic.ts';
-import { createBigEventOverlay } from '../utils/scoringLogic.ts';
+import { createBigEventOverlay, registerBuzzerPress } from '../utils/scoringLogic.ts';
 import {
   getCachedLocalState,
   saveCachedLocalState,
@@ -115,7 +115,15 @@ export function useScoreboard() {
             } else {
               setState(event.data.payload);
             }
-            setConnectionType((prev) => (prev === 'ws' ? 'ws' : 'local'));
+            if (event.data.extra) {
+              setLastEvent(event.data.extra);
+              if (event.data.extra.type === 'BUZZER_RING') playBuzzerSound();
+              else if (event.data.extra.type === 'SCORE_CHANGED') {
+                if (Number(event.data.extra.delta) >= 0) playCorrectSound();
+                else playWrongSound();
+              } else if (event.data.extra.type === 'TIMER_END') playTimesUpSound();
+              else if (event.data.extra.type === 'TIMER_TICK' && event.data.extra.secondsLeft <= 5) playTimerTick();
+            }
           }
         };
       } catch (e) {
@@ -571,20 +579,84 @@ export function useScoreboard() {
     } catch {}
   };
 
-  const buzzIn = async (teamId: string) => {
-    try {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+  const buzzIn = async (teamId: string): Promise<{ success: boolean; isFirst?: boolean; message?: string }> => {
+    const currentState = stateRef.current;
+    if (!currentState) {
+      return { success: false, message: 'Status papan skor belum termuat' };
+    }
+
+    if (currentState.isBuzzerLocked) {
+      return { success: false, message: 'Bel saat ini terkunci' };
+    }
+
+    const team = currentState.teams.find((t) => t.id === teamId);
+    if (!team) {
+      return { success: false, message: 'Regu tidak ditemukan' };
+    }
+
+    if (currentState.buzzerQueue.some((b) => b.teamId === teamId)) {
+      return { success: false, message: 'Sudah tercatat dalam antrean bel' };
+    }
+
+    const now = Date.now();
+    const { updatedQueue, isFirst } = registerBuzzerPress(
+      currentState.buzzerQueue,
+      team,
+      currentState.isBuzzerLocked,
+      now
+    );
+
+    // 1. Play authentic cerdas cermat buzzer sound immediately
+    playBuzzerSound();
+
+    // 2. Commit optimistic update to state, BroadcastChannel, and Supabase Realtime
+    commitStateUpdate(
+      (prev) => {
+        if (prev.isBuzzerLocked || prev.buzzerQueue.some((b) => b.teamId === teamId)) {
+          return prev;
+        }
+
+        const activeAnnouncement = isFirst
+          ? {
+              id: 'buzz-' + now,
+              type: 'buzzer' as const,
+              teamId: team.id,
+              teamName: team.name,
+              message: `${team.code} (${team.name}) menekan bel tercepat!`,
+              timestamp: now,
+            }
+          : prev.activeAnnouncement;
+
+        return {
+          ...prev,
+          buzzerQueue: updatedQueue,
+          activeAnnouncement,
+        };
+      },
+      { type: 'BUZZER_RING', teamId, isFirst },
+      false
+    );
+
+    // 3. Send via WebSocket if open
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
         wsRef.current.send(JSON.stringify({ type: 'BUZZER_PRESS', teamId }));
-      } else {
+      } catch {}
+    } else {
+      try {
         await fetch('/api/buzzer/buzz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ teamId }),
         });
-      }
-    } catch (e) {
-      console.error(e);
+      } catch {}
     }
+
+    return {
+      success: true,
+      isFirst,
+      message: isFirst ? '🏆 ANDA BEL TERCEPAT!' : 'Tercatat dalam antrean bel',
+    };
   };
 
   const resetBuzzer = async () => {
@@ -592,8 +664,9 @@ export function useScoreboard() {
       (prev) => ({
         ...prev,
         buzzerQueue: [],
+        activeAnnouncement: prev.activeAnnouncement?.type === 'buzzer' ? null : prev.activeAnnouncement,
       }),
-      undefined,
+      { type: 'BUZZER_RESET' },
       false
     );
 
@@ -610,7 +683,7 @@ export function useScoreboard() {
         ...prev,
         isBuzzerLocked: locked,
       }),
-      undefined,
+      { type: 'BUZZER_LOCK', locked },
       false
     );
 

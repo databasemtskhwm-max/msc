@@ -8,9 +8,11 @@ import {
   Settings,
   Calendar,
   Sparkles,
+  Volume2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MuhsinLogo } from './MuhsinLogo.tsx';
+import { unlockAudio, isAudioUnlocked } from '../utils/audio.ts';
 
 interface StageDisplayProps {
   state: ScoreboardState;
@@ -72,11 +74,30 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
   onResetBuzzer,
 }) => {
   const [lastDeltas, setLastDeltas] = useState<Record<string, { delta: number; key: number }>>({});
+  const [audioUnlocked, setAudioUnlocked] = useState(true);
   const lastHistoryIdRef = useRef<string | null>(null);
   const timeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const rankedTeams = useMemo(() => rankTeams(state.teams), [state.teams]);
   const currentRound = state.rounds.find((r) => r.id === state.currentRoundId) || state.rounds[0];
+
+  // Auto-detect and unlock browser audio for stage screen
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAudioUnlocked(isAudioUnlocked());
+      const onUserInteraction = () => {
+        unlockAudio().then((unlocked) => {
+          if (unlocked) setAudioUnlocked(true);
+        });
+      };
+      window.addEventListener('pointerdown', onUserInteraction, { once: true });
+      window.addEventListener('keydown', onUserInteraction, { once: true });
+      return () => {
+        window.removeEventListener('pointerdown', onUserInteraction);
+        window.removeEventListener('keydown', onUserInteraction);
+      };
+    }
+  }, []);
 
   // Detect genuine score changes and trigger glowing flash effect on the team's card
   useEffect(() => {
@@ -210,29 +231,45 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
 
       {/* Buzzer Alert Banner (Triggered when contestants buzz in) */}
       {firstBuzzer && (
-        <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 border-2 border-amber-300 text-white rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 animate-bounce duration-1000 z-20">
+        <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 border-2 border-amber-300 text-white rounded-3xl p-5 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-5 animate-bounce duration-1000 z-20">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-white text-rose-700 flex items-center justify-center font-black shadow-md">
-              <BellRing className="w-7 h-7" />
+            <div className="w-14 h-14 rounded-2xl bg-white text-rose-700 flex items-center justify-center font-black shadow-lg ring-4 ring-amber-300/60 shrink-0">
+              <BellRing className="w-8 h-8 animate-spin duration-1000" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="bg-amber-400 text-slate-950 font-black text-xs uppercase px-2.5 py-0.5 rounded-full">
-                  BEL TERCEPAT
+                <span className="bg-amber-400 text-slate-950 font-black text-xs uppercase px-3 py-0.5 rounded-full shadow-xs">
+                  🏆 BEL TERCEPAT
                 </span>
-                <span className="text-rose-100 text-xs font-mono font-bold">+0.00 detik</span>
+                <span className="text-amber-200 text-xs font-mono font-bold">+0.00 detik</span>
               </div>
-              <h2 className="text-2xl md:text-3xl font-black mt-0.5">
-                {firstBuzzer.teamCode} — <span className="text-amber-200">{firstBuzzer.teamName}</span>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1 tracking-tight text-white drop-shadow-md">
+                {firstBuzzer.teamCode} — <span className="text-amber-300">{firstBuzzer.teamName}</span>
               </h2>
+
+              {/* Subsequent buzzer queue chips */}
+              {state.buzzerQueue.length > 1 && (
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="text-xs text-rose-100 font-semibold">Antrean Bel:</span>
+                  {state.buzzerQueue.slice(1).map((item, qIdx) => (
+                    <span
+                      key={item.teamId}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-black/30 border border-white/20 text-xs text-white font-mono"
+                    >
+                      <span className="font-bold text-amber-300">#{qIdx + 2} {item.teamCode}</span>
+                      <span className="text-slate-200 text-[11px]">(+{(item.relativeMs / 1000).toFixed(2)}s)</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {onResetBuzzer && (
               <button
                 onClick={onResetBuzzer}
-                className="px-4 py-2 bg-white text-rose-800 hover:bg-rose-50 font-bold text-sm rounded-xl transition shadow cursor-pointer"
+                className="px-5 py-2.5 bg-white text-rose-800 hover:bg-rose-50 font-black text-sm rounded-xl transition shadow-lg hover:shadow-xl cursor-pointer"
               >
                 Reset Bel
               </button>
@@ -267,9 +304,9 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   ? 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 border-4 border-emerald-200 ring-4 ring-emerald-400 ring-offset-2 ring-offset-emerald-950 shadow-[0_0_55px_rgba(16,185,129,0.95)] scale-[1.04] z-30 animate-pulse'
                   : isNegativeFlash
                   ? 'bg-gradient-to-br from-rose-600 via-rose-700 to-rose-800 border-4 border-rose-200 ring-4 ring-rose-400 ring-offset-2 ring-offset-rose-950 shadow-[0_0_55px_rgba(244,63,94,0.95)] scale-[1.04] z-30 animate-pulse'
-                  : `bg-white border-2 ${preset.borderClass} hover:shadow-lg ${
-                      isBuzzerFirst ? 'ring-4 ring-rose-500 scale-[1.02]' : ''
-                    }`
+                  : isBuzzerFirst
+                  ? 'bg-white border-4 border-amber-400 ring-8 ring-amber-400 shadow-[0_0_55px_rgba(245,158,11,0.95)] scale-[1.03] z-30 animate-pulse'
+                  : `bg-white border-2 ${preset.borderClass} hover:shadow-lg`
               }`}
             >
               {/* Subtle background arabesque watermark inside card */}
@@ -307,6 +344,14 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
                   >
                     {team.code}
                   </span>
+
+                  {/* Fast Buzzer Highlight Badge */}
+                  {isBuzzerFirst && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[11px] shadow-sm animate-bounce flex items-center gap-1">
+                      <BellRing className="w-3 h-3" />
+                      <span>BEL #1</span>
+                    </span>
+                  )}
 
                   {/* Standing Rank Badge (#1, #2, #3, dll. Tanpa label Juara) */}
                   <div className="flex items-center gap-1 font-bold text-xs">
@@ -683,6 +728,21 @@ export const StageDisplay: React.FC<StageDisplayProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Floating Audio Unlock Helper if Browser Autoplay Policy Suspended Audio */}
+      {!audioUnlocked && (
+        <button
+          onClick={() => {
+            unlockAudio().then((unlocked) => {
+              if (unlocked) setAudioUnlocked(true);
+            });
+          }}
+          className="fixed bottom-5 right-5 z-50 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white animate-bounce cursor-pointer"
+        >
+          <Volume2 className="w-4 h-4" />
+          <span>Klik Layar untuk Mengaktifkan Suara Bel Panggung 🔊</span>
+        </button>
+      )}
     </div>
   );
 };

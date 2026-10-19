@@ -17,6 +17,34 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
+// Global auto-unlock on user gesture so stage screen and tablets can play sound
+if (typeof window !== 'undefined') {
+  const tryUnlock = () => {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    } else if (!audioCtx) {
+      getAudioContext();
+    }
+  };
+  window.addEventListener('pointerdown', tryUnlock, { passive: true });
+  window.addEventListener('keydown', tryUnlock, { passive: true });
+  window.addEventListener('touchstart', tryUnlock, { passive: true });
+}
+
+export function unlockAudio(): Promise<boolean> {
+  const ctx = getAudioContext();
+  if (!ctx) return Promise.resolve(false);
+  if (ctx.state === 'suspended') {
+    return ctx.resume().then(() => ctx.state === 'running').catch(() => false);
+  }
+  return Promise.resolve(ctx.state === 'running');
+}
+
+export function isAudioUnlocked(): boolean {
+  if (!audioCtx) return false;
+  return audioCtx.state === 'running';
+}
+
 export function setAudioMuted(muted: boolean) {
   isMuted = muted;
 }
@@ -25,31 +53,101 @@ export function getAudioMuted(): boolean {
   return isMuted;
 }
 
+/**
+ * Authentic Indonesian Cerdas Cermat Electronic Quiz Buzzer Synthesizer
+ * Produces the iconic loud, harsh, piercing "TEEEEET!" electronic horn sound
+ * using harmonic sawtooth + square beating frequencies with megaphone resonance.
+ */
 export function playBuzzerSound() {
   if (isMuted) return;
   const ctx = getAudioContext();
   if (!ctx) return;
 
-  const osc1 = ctx.createOscillator();
-  const osc2 = ctx.createOscillator();
-  const gain = ctx.createGain();
+  try {
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
-  osc1.type = 'sawtooth';
-  osc2.type = 'square';
-  osc1.frequency.setValueAtTime(220, ctx.currentTime);
-  osc2.frequency.setValueAtTime(224, ctx.currentTime);
+    const now = ctx.currentTime;
+    const duration = 0.75;
 
-  gain.gain.setValueAtTime(0.3, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    // Master envelope with punch attack and crisp cutoff
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(0.55, now + 0.008);
+    masterGain.gain.setValueAtTime(0.55, now + duration - 0.06);
+    masterGain.gain.linearRampToValueAtTime(0.001, now + duration);
 
-  osc1.connect(gain);
-  osc2.connect(gain);
-  gain.connect(ctx.destination);
+    // Bandpass megaphone horn filter
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(950, now);
+    filter.Q.setValueAtTime(1.8, now);
 
-  osc1.start();
-  osc2.start();
-  osc1.stop(ctx.currentTime + 0.6);
-  osc2.stop(ctx.currentTime + 0.6);
+    // Distortion WaveShaper for characteristic gritty electromechanical buzz
+    const distortion = ctx.createWaveShaper();
+    const nSamples = 2048;
+    const curve = new Float32Array(nSamples);
+    const k = 15;
+    for (let i = 0; i < nSamples; ++i) {
+      const x = (i * 2) / nSamples - 1;
+      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    distortion.curve = curve;
+    distortion.oversample = '2x';
+
+    // Frequencies: Bb4 (466.16Hz) + A4 (440Hz) produces authentic 26Hz beating buzz
+    const osc1 = ctx.createOscillator(); // Main Bb4
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(466.16, now);
+
+    const osc2 = ctx.createOscillator(); // Detuned A4 for beat flutter
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(440.0, now);
+
+    const osc3 = ctx.createOscillator(); // Square wave for relay vibration
+    osc3.type = 'square';
+    osc3.frequency.setValueAtTime(466.16, now);
+
+    const oscSub = ctx.createOscillator(); // Sub Bb3 for chest presence
+    oscSub.type = 'sawtooth';
+    oscSub.frequency.setValueAtTime(233.08, now);
+
+    const oscHigh = ctx.createOscillator(); // Piercing Bb5 high overtone
+    oscHigh.type = 'sawtooth';
+    oscHigh.frequency.setValueAtTime(932.33, now);
+
+    // Mixer gains
+    const g1 = ctx.createGain(); g1.gain.value = 0.35;
+    const g2 = ctx.createGain(); g2.gain.value = 0.30;
+    const g3 = ctx.createGain(); g3.gain.value = 0.25;
+    const gSub = ctx.createGain(); gSub.gain.value = 0.20;
+    const gHigh = ctx.createGain(); gHigh.gain.value = 0.15;
+
+    osc1.connect(g1); g1.connect(distortion);
+    osc2.connect(g2); g2.connect(distortion);
+    osc3.connect(g3); g3.connect(distortion);
+    oscSub.connect(gSub); gSub.connect(distortion);
+    oscHigh.connect(gHigh); gHigh.connect(distortion);
+
+    distortion.connect(filter);
+    filter.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc3.start(now);
+    oscSub.start(now);
+    oscHigh.start(now);
+
+    osc1.stop(now + duration);
+    osc2.stop(now + duration);
+    osc3.stop(now + duration);
+    oscSub.stop(now + duration);
+    oscHigh.stop(now + duration);
+  } catch (e) {
+    console.warn('Audio playback error:', e);
+  }
 }
 
 export function playCorrectSound() {
