@@ -54,9 +54,9 @@ export function getAudioMuted(): boolean {
 }
 
 /**
- * Authentic Indonesian Cerdas Cermat Electronic Quiz Buzzer Synthesizer
- * Produces the iconic loud, harsh, piercing "TEEEEET!" electronic horn sound
- * using harmonic sawtooth + square beating frequencies with megaphone resonance.
+ * Authentic Indonesian Cerdas Cermat Horn & Resonant Bell ("Klakson & Lonceng Cerdas Cermat")
+ * Menggabungkan semburan klakson kuis dual-tone yang tegas dan bertenaga dengan dentang lonceng
+ * tembaga panggung yang nyaring, bergema, dan berbunyi jauh lebih keras ("lebih keras lagi kaya lonceng").
  */
 export function playBuzzerSound() {
   if (isMuted) return;
@@ -69,82 +69,124 @@ export function playBuzzerSound() {
     }
 
     const now = ctx.currentTime;
-    const duration = 0.75;
 
-    // Master envelope with punch attack and crisp cutoff
+    // Master Dynamics Compressor: Memaksimalkan volume audio panggung agar sangat keras
+    // tanpa terjadi distorsi digital clipping (0 dBFS ceiling)
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-10, now);
+    compressor.knee.setValueAtTime(4, now);
+    compressor.ratio.setValueAtTime(16, now);
+    compressor.attack.setValueAtTime(0.002, now);
+    compressor.release.setValueAtTime(0.12, now);
+
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0, now);
-    masterGain.gain.linearRampToValueAtTime(0.55, now + 0.008);
-    masterGain.gain.setValueAtTime(0.55, now + duration - 0.06);
-    masterGain.gain.linearRampToValueAtTime(0.001, now + duration);
+    masterGain.gain.setValueAtTime(0.95, now); // Output volume maksimal dan bertenaga
 
-    // Bandpass megaphone horn filter
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(950, now);
-    filter.Q.setValueAtTime(1.8, now);
+    compressor.connect(masterGain);
+    masterGain.connect(ctx.destination);
 
-    // Distortion WaveShaper for characteristic gritty electromechanical buzz
-    const distortion = ctx.createWaveShaper();
-    const nSamples = 2048;
+    // ==========================================
+    // 1. KOMPONEN KLAKSON (Dual-Tone Stadium/Quiz Horn Blast)
+    // ==========================================
+    const hornDuration = 0.48;
+    const hornGain = ctx.createGain();
+    hornGain.gain.setValueAtTime(0, now);
+    hornGain.gain.linearRampToValueAtTime(0.70, now + 0.006); // Serangan cepat & bertenaga
+    hornGain.gain.setValueAtTime(0.70, now + hornDuration - 0.06);
+    hornGain.gain.exponentialRampToValueAtTime(0.001, now + hornDuration);
+
+    // WaveShaper Distortion untuk karakter serak khas klakson elektromekanis
+    const hornDistortion = ctx.createWaveShaper();
+    const nSamples = 1024;
     const curve = new Float32Array(nSamples);
-    const k = 15;
+    const k = 12;
     for (let i = 0; i < nSamples; ++i) {
       const x = (i * 2) / nSamples - 1;
       curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
     }
-    distortion.curve = curve;
-    distortion.oversample = '2x';
+    hornDistortion.curve = curve;
+    hornDistortion.oversample = '2x';
 
-    // Frequencies: Bb4 (466.16Hz) + A4 (440Hz) produces authentic 26Hz beating buzz
-    const osc1 = ctx.createOscillator(); // Main Bb4
-    osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(466.16, now);
+    // Frekuensi Klakson: Akor A4 (440 Hz) + C#5 (554.37 Hz) + sub-bass A3 (220 Hz)
+    const hornOsc1 = ctx.createOscillator();
+    hornOsc1.type = 'sawtooth';
+    hornOsc1.frequency.setValueAtTime(440.0, now);
 
-    const osc2 = ctx.createOscillator(); // Detuned A4 for beat flutter
-    osc2.type = 'sawtooth';
-    osc2.frequency.setValueAtTime(440.0, now);
+    const hornOsc2 = ctx.createOscillator();
+    hornOsc2.type = 'sawtooth';
+    hornOsc2.frequency.setValueAtTime(554.37, now);
 
-    const osc3 = ctx.createOscillator(); // Square wave for relay vibration
-    osc3.type = 'square';
-    osc3.frequency.setValueAtTime(466.16, now);
+    const hornOsc3 = ctx.createOscillator();
+    hornOsc3.type = 'square';
+    hornOsc3.frequency.setValueAtTime(440.0, now);
 
-    const oscSub = ctx.createOscillator(); // Sub Bb3 for chest presence
-    oscSub.type = 'sawtooth';
-    oscSub.frequency.setValueAtTime(233.08, now);
+    const hornOscSub = ctx.createOscillator();
+    hornOscSub.type = 'sawtooth';
+    hornOscSub.frequency.setValueAtTime(220.0, now);
 
-    const oscHigh = ctx.createOscillator(); // Piercing Bb5 high overtone
-    oscHigh.type = 'sawtooth';
-    oscHigh.frequency.setValueAtTime(932.33, now);
+    const hornFilter = ctx.createBiquadFilter();
+    hornFilter.type = 'peaking';
+    hornFilter.frequency.setValueAtTime(1100, now);
+    hornFilter.gain.setValueAtTime(5, now);
+    hornFilter.Q.setValueAtTime(1.4, now);
 
-    // Mixer gains
-    const g1 = ctx.createGain(); g1.gain.value = 0.35;
-    const g2 = ctx.createGain(); g2.gain.value = 0.30;
-    const g3 = ctx.createGain(); g3.gain.value = 0.25;
-    const gSub = ctx.createGain(); gSub.gain.value = 0.20;
-    const gHigh = ctx.createGain(); gHigh.gain.value = 0.15;
+    hornOsc1.connect(hornDistortion);
+    hornOsc2.connect(hornDistortion);
+    hornOsc3.connect(hornDistortion);
+    hornOscSub.connect(hornDistortion);
+    hornDistortion.connect(hornFilter);
+    hornFilter.connect(hornGain);
+    hornGain.connect(compressor);
 
-    osc1.connect(g1); g1.connect(distortion);
-    osc2.connect(g2); g2.connect(distortion);
-    osc3.connect(g3); g3.connect(distortion);
-    oscSub.connect(gSub); gSub.connect(distortion);
-    oscHigh.connect(gHigh); gHigh.connect(distortion);
+    hornOsc1.start(now);
+    hornOsc2.start(now);
+    hornOsc3.start(now);
+    hornOscSub.start(now);
 
-    distortion.connect(filter);
-    filter.connect(masterGain);
-    masterGain.connect(ctx.destination);
+    hornOsc1.stop(now + hornDuration);
+    hornOsc2.stop(now + hornDuration);
+    hornOsc3.stop(now + hornDuration);
+    hornOscSub.stop(now + hornDuration);
 
-    osc1.start(now);
-    osc2.start(now);
-    osc3.start(now);
-    oscSub.start(now);
-    oscHigh.start(now);
+    // ==========================================
+    // 2. KOMPONEN LONCENG (Loud Ringing Brass Competition Bell)
+    // ==========================================
+    const bellDuration = 1.35; // Ekor dengung gema lonceng yang panjang
 
-    osc1.stop(now + duration);
-    osc2.stop(now + duration);
-    osc3.stop(now + duration);
-    oscSub.stop(now + duration);
-    oscHigh.stop(now + duration);
+    const bellGain = ctx.createGain();
+    bellGain.gain.setValueAtTime(0, now);
+    bellGain.gain.linearRampToValueAtTime(0.90, now + 0.002); // Dentang palu logam instan
+    bellGain.gain.exponentialRampToValueAtTime(0.001, now + bellDuration);
+
+    // Harmonik Inharmonis Lonceng Kuningan Asli:
+    // Pukulan Utama (880 Hz A5 & 1046.5 Hz C6) + Chime Gemerincing (1760 Hz & 2637 Hz) + Hum Bass (440 Hz)
+    const bellPartials = [
+      { freq: 880.0, gain: 0.55, decay: 1.25 },  // Nada pokok dentang lonceng
+      { freq: 1046.5, gain: 0.40, decay: 1.05 }, // Tierce minor
+      { freq: 1318.5, gain: 0.35, decay: 0.95 }, // Kuinta E6
+      { freq: 1760.0, gain: 0.35, decay: 0.85 }, // Oktaf nominal lonceng
+      { freq: 2637.0, gain: 0.25, decay: 0.60 }, // Dentang logam tinggi
+      { freq: 440.0, gain: 0.40, decay: 1.35 },  // Dengung hum tembaga dalam
+    ];
+
+    bellPartials.forEach((partial) => {
+      const bOsc = ctx.createOscillator();
+      const bPartGain = ctx.createGain();
+
+      bOsc.type = 'sine';
+      bOsc.frequency.setValueAtTime(partial.freq, now);
+
+      bPartGain.gain.setValueAtTime(partial.gain, now);
+      bPartGain.gain.exponentialRampToValueAtTime(0.001, now + partial.decay);
+
+      bOsc.connect(bPartGain);
+      bPartGain.connect(bellGain);
+
+      bOsc.start(now);
+      bOsc.stop(now + partial.decay);
+    });
+
+    bellGain.connect(compressor);
   } catch (e) {
     console.warn('Audio playback error:', e);
   }
